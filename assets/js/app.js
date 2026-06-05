@@ -40,10 +40,18 @@ const tickerItems = {
   es:["Mindfulness","Resiliencia","Autodeterminación","IA & Humanidad","Alegría mundial","Propósito","Estados de Flow","Wabi-Sabi","Hygge","Ikigai","Ubuntu","Bienestar Digital"],
 };
 function buildTicker() {
+  const track = document.getElementById('ticker-track');
+  if (!track) return;
   const items = tickerItems[currentLang] || tickerItems.de;
   const doubled = [...items, ...items];
-  document.getElementById('ticker-track').innerHTML =
+  track.innerHTML =
     doubled.map(i=>`<span class="ticker-item"><span class="ticker-dot"></span>${i}</span>`).join('');
+}
+
+/* ─── CATEGORY NAMES (Badge-Label) ─── */
+function catLabel(cat) {
+  const map = { mindful:"Mindful", joyful:"Joyful", resilient:"Resilient", future:"Future-Self", worldwide:"Worldwide" };
+  return map[cat] || cat;
 }
 
 /* ─── BLOG ─── */
@@ -51,15 +59,16 @@ function renderBlog(cat) {
   currentCat = cat;
   const lang = currentLang;
   const grid = document.getElementById('blog-grid');
+  if (!grid) return;
   const filtered = cat === 'all' ? window.posts : window.posts.filter(p => p.cat === cat);
   grid.innerHTML = filtered.map(p => {
     const d = p[lang] || p.de;
     const isWide = p.wide && cat === 'all';
     return `
-    <div class="blog-card${isWide?' wide':''}" data-cat="${p.cat}">
+    <div class="blog-card${isWide?' wide':''}" data-cat="${p.cat}" data-id="${p.id}">
       <div class="card-thumb" style="background:${p.bg}">
         <div class="thumb-bg">${p.emoji}</div>
-        <span class="card-badge" style="color:${p.badgeColor}">${p.cat}</span>
+        <span class="card-badge" style="color:${p.badgeColor}">${catLabel(p.cat)}</span>
       </div>
       <div class="card-body">
         <div class="card-meta"><span>${p.date}</span><span class="dot"></span><span>${p.read}</span></div>
@@ -71,19 +80,145 @@ function renderBlog(cat) {
           <div class="av" style="background:${p.av}">${p.author}</div>
           <span>${p.authorName}</span>
         </div>
-        <a href="#" class="read-link">${window.i18n[lang]?.read_more||'Lesen →'}</a>
+        <a href="#" class="read-link" data-id="${p.id}">${window.i18n[lang]?.read_more||'Lesen →'}</a>
       </div>
     </div>`;
   }).join('');
   attachHovers();
 }
 
-document.getElementById('filter-tabs').addEventListener('click', e => {
-  const tab = e.target.closest('.filter-tab');
-  if (!tab) return;
-  document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
-  tab.classList.add('active');
-  renderBlog(tab.dataset.cat);
+const filterTabs = document.getElementById('filter-tabs');
+if (filterTabs) {
+  filterTabs.addEventListener('click', e => {
+    const tab = e.target.closest('.filter-tab');
+    if (!tab) return;
+    document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    renderBlog(tab.dataset.cat);
+  });
+}
+
+/* ─── ARTICLE READER (Overlay) ─────────────────────────────
+   Öffnet den vollen content-Text eines Beitrags.
+   Styles werden hier injiziert → unabhängig von main.css.
+──────────────────────────────────────────────────────────── */
+(function injectReaderStyles(){
+  if (document.getElementById('bejoy-reader-style')) return;
+  const css = `
+  #bejoy-reader{position:fixed;inset:0;z-index:9999;display:none;}
+  #bejoy-reader.open{display:block;}
+  #bejoy-reader .reader-backdrop{position:absolute;inset:0;background:rgba(44,24,16,.55);backdrop-filter:blur(4px);}
+  #bejoy-reader .reader-panel{position:absolute;top:0;right:0;height:100%;width:min(720px,100%);
+    background:#FAF7F2;color:#2C1810;overflow-y:auto;box-shadow:-24px 0 80px rgba(44,24,16,.25);
+    transform:translateX(40px);opacity:0;transition:transform .35s ease,opacity .35s ease;}
+  #bejoy-reader.open .reader-panel{transform:translateX(0);opacity:1;}
+  #bejoy-reader .reader-hero{padding:64px 56px 28px;position:relative;}
+  #bejoy-reader .reader-emoji{font-size:56px;line-height:1;margin-bottom:18px;}
+  #bejoy-reader .reader-badge{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.08em;
+    text-transform:uppercase;padding:5px 12px;border-radius:100px;background:#E8F5F3;color:#1A7A6E;margin-bottom:18px;}
+  #bejoy-reader .reader-title{font-family:Georgia,'Playfair Display',serif;font-size:34px;line-height:1.18;margin:0 0 14px;font-weight:700;}
+  #bejoy-reader .reader-meta{font-size:14px;color:#6B6560;display:flex;gap:10px;align-items:center;}
+  #bejoy-reader .reader-meta .dot{width:4px;height:4px;border-radius:50%;background:#C9C2BA;display:inline-block;}
+  #bejoy-reader .reader-body{padding:8px 56px 80px;font-size:17px;line-height:1.72;}
+  #bejoy-reader .reader-body h2{font-family:Georgia,'Playfair Display',serif;font-size:23px;margin:34px 0 12px;color:#1A7A6E;}
+  #bejoy-reader .reader-body p{margin:0 0 18px;}
+  #bejoy-reader .reader-body strong{color:#2C1810;}
+  #bejoy-reader .reader-close{position:absolute;top:24px;right:28px;width:42px;height:42px;border:none;
+    border-radius:50%;background:#FFF;color:#2C1810;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(44,24,16,.12);
+    display:flex;align-items:center;justify-content:center;transition:transform .2s;}
+  #bejoy-reader .reader-close:hover{transform:rotate(90deg) scale(1.05);}
+  @media(max-width:600px){
+    #bejoy-reader .reader-hero{padding:56px 24px 22px;}
+    #bejoy-reader .reader-body{padding:8px 24px 64px;font-size:16px;}
+    #bejoy-reader .reader-title{font-size:27px;}
+  }`;
+  const style = document.createElement('style');
+  style.id = 'bejoy-reader-style';
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
+
+function ensureReaderEl(){
+  let r = document.getElementById('bejoy-reader');
+  if (r) return r;
+  r = document.createElement('div');
+  r.id = 'bejoy-reader';
+  r.innerHTML = `
+    <div class="reader-backdrop" data-close="1"></div>
+    <article class="reader-panel">
+      <button class="reader-close" data-close="1" aria-label="Close">✕</button>
+      <div class="reader-hero">
+        <div class="reader-emoji"></div>
+        <span class="reader-badge"></span>
+        <h1 class="reader-title"></h1>
+        <div class="reader-meta"></div>
+      </div>
+      <div class="reader-body"></div>
+    </article>`;
+  document.body.appendChild(r);
+  r.addEventListener('click', e => { if (e.target.dataset.close) closeReader(); });
+  return r;
+}
+
+function openReader(id){
+  const post = window.posts.find(p => String(p.id) === String(id));
+  if (!post) return;
+  const d = post[currentLang] || post.de;
+  const r = ensureReaderEl();
+  r.querySelector('.reader-emoji').textContent = post.emoji;
+  const badge = r.querySelector('.reader-badge');
+  badge.textContent = catLabel(post.cat);
+  badge.style.color = post.badgeColor;
+  r.querySelector('.reader-title').textContent = d.title;
+  r.querySelector('.reader-meta').innerHTML =
+    `<span>${post.authorName}</span><span class="dot"></span><span>${post.date}</span><span class="dot"></span><span>${post.read}</span>`;
+  r.querySelector('.reader-body').innerHTML = d.content || `<p>${d.excerpt}</p>`;
+  r.querySelector('.reader-panel').scrollTop = 0;
+  r.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeReader(){
+  const r = document.getElementById('bejoy-reader');
+  if (!r) return;
+  r.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* Klick auf "Lesen →" oder irgendwo auf die Karte öffnet den Reader */
+document.addEventListener('click', e => {
+  const link = e.target.closest('.read-link');
+  if (link) { e.preventDefault(); openReader(link.dataset.id); return; }
+  const card = e.target.closest('.blog-card');
+  if (card && card.dataset.id) { e.preventDefault(); openReader(card.dataset.id); }
+});
+
+/* "Alle KI-Artikel lesen" → springt zum Blog & filtert auf future */
+document.addEventListener('click', e => {
+  const aiLink = e.target.closest('[data-ai-all], .ai-all-link');
+  if (!aiLink) return;
+  e.preventDefault();
+  const tab = document.querySelector('.filter-tab[data-cat="future"]');
+  if (tab) tab.click();
+  document.getElementById('blog')?.scrollIntoView({behavior:'smooth'});
+});
+
+/* Esc schließt den Reader */
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReader(); });
+
+/* ─── SMOOTH SCROLL für alle #-Anker (Menü etc.) ─── */
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a) return;
+  const href = a.getAttribute('href');
+  if (href === '#' || href.length < 2) return;          // leere Anker ignorieren
+  const target = document.getElementById(href.slice(1));
+  if (!target) return;                                   // kein Ziel → normal lassen
+  e.preventDefault();
+  target.scrollIntoView({behavior:'smooth', block:'start'});
+  // Mobile-Menü schließen, falls offen
+  document.getElementById('hamburger')?.classList.remove('open');
+  document.getElementById('mobile-nav')?.classList.remove('open');
 });
 
 /* ─── SIDEBAR ─── */
@@ -106,16 +241,24 @@ window.addEventListener('scroll', () => {
   if (bar) bar.style.width = pct.toFixed(1)+'%';
 }, {passive:true});
 
-/* ─── CURSOR ─── */
+/* ─── CURSOR ───
+   WICHTIG: pointer-events:none wird hier erzwungen, damit der
+   Custom-Cursor keine Klicks abfängt (war die Ursache, dass
+   Menü-Links nicht reagiert haben).
+──────────────────────────────────────────────────────────── */
 const cursor = document.getElementById('cursor');
-let cursorOn = false;
-document.addEventListener('mousemove', e => {
-  if (!cursorOn) { cursor.classList.remove('hidden'); cursorOn=true; }
-  cursor.style.left = e.clientX+'px';
-  cursor.style.top  = e.clientY+'px';
-});
-document.addEventListener('mouseleave', ()=>cursor.classList.add('hidden'));
+if (cursor) {
+  cursor.style.pointerEvents = 'none';   // ← der eigentliche Navigations-Fix
+  let cursorOn = false;
+  document.addEventListener('mousemove', e => {
+    if (!cursorOn) { cursor.classList.remove('hidden'); cursorOn=true; }
+    cursor.style.left = e.clientX+'px';
+    cursor.style.top  = e.clientY+'px';
+  });
+  document.addEventListener('mouseleave', ()=>cursor.classList.add('hidden'));
+}
 function attachHovers() {
+  if (!cursor) return;
   document.querySelectorAll('a,button,.cat-card,.blog-card,.wisdom-card,.ai-card').forEach(el=>{
     el.addEventListener('mouseenter',()=>cursor.classList.add('hovering'));
     el.addEventListener('mouseleave',()=>cursor.classList.remove('hovering'));
@@ -136,27 +279,29 @@ document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
 /* ─── NAV SCROLL ─── */
 const nav = document.getElementById('main-nav');
 window.addEventListener('scroll',()=>{
-  nav.classList.toggle('scrolled', window.scrollY>24);
-  document.getElementById('scroll-top').classList.toggle('visible', window.scrollY>400);
+  if (nav) nav.classList.toggle('scrolled', window.scrollY>24);
+  document.getElementById('scroll-top')?.classList.toggle('visible', window.scrollY>400);
 },{passive:true});
 
 /* ─── HAMBURGER ─── */
 const ham = document.getElementById('hamburger');
 const mob = document.getElementById('mobile-nav');
-ham.addEventListener('click',()=>{
-  ham.classList.toggle('open');
-  mob.classList.toggle('open');
-});
-mob.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
-  ham.classList.remove('open'); mob.classList.remove('open');
-}));
+if (ham && mob) {
+  ham.addEventListener('click',()=>{
+    ham.classList.toggle('open');
+    mob.classList.toggle('open');
+  });
+  mob.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
+    ham.classList.remove('open'); mob.classList.remove('open');
+  }));
+}
 
 /* ─── SCROLL TOP ─── */
-document.getElementById('scroll-top').addEventListener('click',()=>
+document.getElementById('scroll-top')?.addEventListener('click',()=>
   window.scrollTo({top:0,behavior:'smooth'}));
 
 /* ─── NEWSLETTER ─── */
-document.getElementById('nl-btn').addEventListener('click', function(){
+document.getElementById('nl-btn')?.addEventListener('click', function(){
   const input = document.getElementById('nl-input');
   const t = window.i18n[currentLang];
   if (input.value?.includes('@')){
@@ -172,12 +317,12 @@ document.getElementById('nl-btn').addEventListener('click', function(){
 
 /* ─── COOKIE ─── */
 const banner = document.getElementById('cookie-banner');
-if (localStorage.getItem('bejoy_cookie')) banner.style.display='none';
-document.getElementById('cookie-accept').addEventListener('click',()=>{
-  localStorage.setItem('bejoy_cookie','accepted'); banner.style.display='none';
+if (banner && localStorage.getItem('bejoy_cookie')) banner.style.display='none';
+document.getElementById('cookie-accept')?.addEventListener('click',()=>{
+  localStorage.setItem('bejoy_cookie','accepted'); if(banner) banner.style.display='none';
 });
-document.getElementById('cookie-decline').addEventListener('click',()=>{
-  localStorage.setItem('bejoy_cookie','declined'); banner.style.display='none';
+document.getElementById('cookie-decline')?.addEventListener('click',()=>{
+  localStorage.setItem('bejoy_cookie','declined'); if(banner) banner.style.display='none';
 });
 
 /* ─── INIT ─── */
