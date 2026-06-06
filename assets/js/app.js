@@ -262,29 +262,11 @@ window.addEventListener('scroll', () => {
 }, {passive:true});
 
 /* ─── CURSOR ───
-   Das Styling kommt vollständig aus main.css (#cursor):
-   12px Punkt in Joy-Gelb, bei .hovering ein Ring, pointer-events:none,
-   auf Touch via @media ausgeblendet. JS setzt nur Position + .hovering.
+   Custom-Cursor entfernt: der native Mauszeiger bleibt immer sichtbar.
+   attachHovers bleibt als No-Op erhalten, damit bestehende Aufrufe
+   (renderBlog, Init) weiterhin gefahrlos funktionieren.
 ──────────────────────────────────────────────────────────── */
-const cursor = document.getElementById('cursor');
-if (cursor) {
-  let cursorShown = false;
-  document.addEventListener('mousemove', e => {
-    if (!cursorShown) { cursor.classList.remove('hidden'); cursorShown = true; }
-    cursor.style.left = e.clientX + 'px';
-    cursor.style.top  = e.clientY + 'px';
-  }, {passive:true});
-  document.addEventListener('mouseleave', ()=>cursor.classList.add('hidden'));
-}
-function attachHovers() {
-  if (!cursor) return;
-  document.querySelectorAll('a,button,.cat-card,.blog-card,.wisdom-card,.ai-card,.sidebar-list li,[data-open-id],[data-cat-link]').forEach(el=>{
-    if (el.dataset.hoverBound) return;        // nicht doppelt binden
-    el.dataset.hoverBound = '1';
-    el.addEventListener('mouseenter',()=>cursor.classList.add('hovering'));
-    el.addEventListener('mouseleave',()=>cursor.classList.remove('hovering'));
-  });
-}
+function attachHovers() {}
 
 /* ─── SCROLL REVEAL ─── */
 const obs = new IntersectionObserver(entries=>{
