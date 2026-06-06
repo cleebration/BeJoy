@@ -53,23 +53,7 @@ ul { list-style: none; }
 /* ═══════════════════════════════════════════
    CUSTOM CURSOR
 ═══════════════════════════════════════════ */
-body { cursor: none; }
-#cursor {
-  width: 12px; height: 12px;
-  background: var(--joy);
-  border-radius: 50%;
-  position: fixed; top: 0; left: 0;
-  pointer-events: none; z-index: 9999;
-  transition: width .2s, height .2s, background .2s, opacity .3s;
-  transform: translate(-50%,-50%);
-  will-change: transform;
-}
-#cursor.hovering {
-  width: 38px; height: 38px;
-  background: rgba(245,166,35,.2);
-  border: 2px solid var(--joy);
-}
-#cursor.hidden { opacity: 0; }
+/* Custom-Cursor entfernt — der native Mauszeiger bleibt immer sichtbar. */
 
 /* ═══════════════════════════════════════════
    LANGUAGE SWITCHER
@@ -837,8 +821,6 @@ footer {
   .footer-top { grid-template-columns: 1fr; }
   .nl-form { flex-direction: column; border-radius: var(--radius-lg); padding: 16px; }
   .nl-form button { border-radius: var(--radius-md); }
-  body { cursor: auto; }
-  #cursor { display: none; }
   .footer-bottom { flex-direction: column; text-align: center; }
 }
 
