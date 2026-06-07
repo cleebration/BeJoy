@@ -416,6 +416,16 @@ export default function App() {
 
       {/* ── FOOTER ──────────────────────────────────────── */}
       <footer>
+        <div className="footer-langbar">
+          <span className="footer-langbar-label">{lang === "de" ? "Sprache" : lang === "es" ? "Idioma" : "Language"}</span>
+          <div className="footer-lang">
+            {LANGS.map((l) => (
+              <button key={l} className={lang === l ? "active" : ""} onClick={() => changeLang(l)}>
+                {l === "de" ? "Deutsch" : l === "en" ? "English" : "Español"}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="footer-top">
           <div className="footer-brand">
             <button className="logo-wrap" onClick={goHome} style={{ background: "none", border: "none", cursor: "pointer" }}>
@@ -456,13 +466,6 @@ export default function App() {
         </div>
         <div className="footer-bottom">
           <p>{t("footer_copy")}</p>
-          <div className="footer-lang">
-            {LANGS.map((l) => (
-              <button key={l} onClick={() => changeLang(l)} style={{ fontWeight: lang === l ? 700 : 400 }}>
-                {l === "de" ? "Deutsch" : l === "en" ? "English" : "Español"}
-              </button>
-            ))}
-          </div>
         </div>
       </footer>
 
