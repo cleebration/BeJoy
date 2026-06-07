@@ -189,7 +189,6 @@ export default function App() {
               <button key={l} className={`lang-btn ${lang === l ? "active" : ""}`} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>
             ))}
           </div>
-          <a href="#newsletter" className="nav-cta">{t("nav_cta")}</a>
         </div>
         <button className={`hamburger ${mobileOpen ? "open" : ""}`} aria-label="Menu" onClick={() => setMobileOpen((v) => !v)}>
           <span></span><span></span><span></span>
