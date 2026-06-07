@@ -446,6 +446,9 @@ export default function App() {
               <a className="social-btn" href="https://youtube.com/@beJoyLife" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
                 <svg viewBox="0 0 24 24"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" /><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" /></svg>
               </a>
+              <a className="social-btn" href="https://at.pinterest.com/beJoyLife/" target="_blank" rel="noopener noreferrer" aria-label="Pinterest">
+                <svg viewBox="0 0 24 24"><path d="M8 20l4 -9" /><path d="M10.7 14c.437 1.263 1.43 2 2.55 2c2.071 0 3.75 -1.554 3.75 -4a5 5 0 1 0 -9.7 1.7" /><path d="M12 21a9 9 0 1 0 0 -18a9 9 0 0 0 0 18z" /></svg>
+              </a>
             </div>
           </div>
           <div className="footer-col">
