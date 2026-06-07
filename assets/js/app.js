@@ -1,338 +1,510 @@
-/**
- * BeJoy — app.js
- * Requires: i18n.js + posts.js loaded before this file
- */
+import { useState, useEffect, useCallback } from "react";
+import { i18n } from "./i18n.js";
+import { posts, sidebarPosts } from "./data.js";
+import { impressumHTML, datenschutzHTML } from "./legal.js";
 
-/* ─── LANGUAGE ─── */
-let currentLang = localStorage.getItem('bejoy_lang') || 'de';
-let currentCat  = 'all';
+/* ─────────────────────────────────────────────────────────────
+   BeJoy — React/Vite (Architektur nach DerNachruf).
+   Navigation läuft komplett über React-State (onClick) bzw.
+   native Anker-Links. KEIN preventDefault, KEIN scrollIntoView,
+   keine document-Klick-Delegation → Klicks funktionieren überall.
+───────────────────────────────────────────────────────────── */
 
-function applyLang(lang) {
-  if (!window.i18n[lang]) return;
-  currentLang = lang;
-  localStorage.setItem('bejoy_lang', lang);
-  document.documentElement.lang = lang;
-  const t = window.i18n[lang];
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.dataset.i18n;
-    if (t[key] !== undefined) el.innerHTML = t[key];
+const LANGS = ["de", "en", "es"];
+
+const Logo = () => (
+  <svg className="logo-svg" viewBox="0 0 42 42" fill="none" aria-label="BeJoy Logo">
+    <g opacity=".88">
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+        <ellipse key={deg} cx="21" cy="8" rx="2.2" ry="4.5" fill="#F5A623" transform={`rotate(${deg} 21 21)`} />
+      ))}
+    </g>
+    <circle cx="21" cy="21" r="9.5" fill="#1A7A6E" />
+    <text x="16.5" y="25.5" fontFamily="Georgia,serif" fontSize="12" fontWeight="700" fill="#FAF7F2">B</text>
+  </svg>
+);
+
+export default function App() {
+  const [lang, setLang] = useState(() => {
+    try { const s = localStorage.getItem("bejoy_lang"); if (LANGS.includes(s)) return s; } catch (e) {}
+    return "de";
   });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const key = el.dataset.i18nPlaceholder;
-    if (t[key]) el.placeholder = t[key];
+  const [view, setView] = useState("home");          // home | impressum | datenschutz
+  const [activePost, setActivePost] = useState(null); // Artikel-Reader
+  const [filterCat, setFilterCat] = useState("all");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [showTop, setShowTop] = useState(false);
+  const [nlState, setNlState] = useState({ msg: "", ok: null });
+  const [cookie, setCookie] = useState(() => {
+    try { return localStorage.getItem("bejoy_cookie"); } catch (e) { return "x"; }
   });
-  document.querySelectorAll('.lang-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.lang === lang));
-  renderBlog(currentCat);
-  renderSidebar();
-  buildTicker();
-}
 
-/* (Sprachschalter-Klicks werden im zentralen Klick-Handler unten behandelt) */
+  const t = useCallback((k) => (i18n[lang] && i18n[lang][k]) ?? i18n.de[k] ?? k, [lang]);
 
-/* ─── TICKER ─── */
-const tickerItems = {
-  de:["Mindfulness","Resilienz","Selbstbestimmung","KI & Menschlichkeit","Glück weltweit","Purpose & Sinn","Flow-Zustände","Wabi-Sabi","Hygge","Ikigai","Ubuntu","Digitales Wohlbefinden"],
-  en:["Mindfulness","Resilience","Self-determination","AI & Humanity","Joy worldwide","Purpose & Meaning","Flow States","Wabi-Sabi","Hygge","Ikigai","Ubuntu","Digital Wellbeing"],
-  es:["Mindfulness","Resiliencia","Autodeterminación","IA & Humanidad","Alegría mundial","Propósito","Estados de Flow","Wabi-Sabi","Hygge","Ikigai","Ubuntu","Bienestar Digital"],
-};
-function buildTicker() {
-  const track = document.getElementById('ticker-track');
-  if (!track) return;
-  const items = tickerItems[currentLang] || tickerItems.de;
-  const doubled = [...items, ...items];
-  track.innerHTML =
-    doubled.map(i=>`<span class="ticker-item"><span class="ticker-dot"></span>${i}</span>`).join('');
-}
+  const catLabel = useCallback((cat) => {
+    const map = { mindful: "filter_mindful", joyful: "filter_joyful", resilient: "filter_resilient", future: "filter_future", worldwide: "filter_world" };
+    return t(map[cat] || "filter_all");
+  }, [t]);
 
-/* ─── CATEGORY NAMES (Badge-Label) ─── */
-function catLabel(cat) {
-  const map = { mindful:"Mindful", joyful:"Joyful", resilient:"Resilient", future:"Future-Self", worldwide:"Worldwide" };
-  return map[cat] || cat;
-}
+  /* Sprache wechseln + merken */
+  const changeLang = (l) => {
+    setLang(l);
+    try { localStorage.setItem("bejoy_lang", l); } catch (e) {}
+    document.documentElement.lang = l;
+  };
 
-/* ─── BLOG ─── */
-function renderBlog(cat) {
-  currentCat = cat;
-  const lang = currentLang;
-  const grid = document.getElementById('blog-grid');
-  if (!grid) return;
-  const filtered = cat === 'all' ? window.posts : window.posts.filter(p => p.cat === cat);
-  grid.innerHTML = filtered.map(p => {
-    const d = p[lang] || p.de;
-    const isWide = p.wide && cat === 'all';
-    return `
-    <div class="blog-card${isWide?' wide':''}" data-cat="${p.cat}" data-id="${p.id}">
-      <div class="card-thumb" style="background:${p.bg}">
-        <div class="thumb-bg">${p.emoji}</div>
-        <span class="card-badge" style="color:${p.badgeColor}">${catLabel(p.cat)}</span>
-      </div>
-      <div class="card-body">
-        <div class="card-meta"><span>${p.date}</span><span class="dot"></span><span>${p.read}</span></div>
-        <h3>${d.title}</h3>
-        <p>${d.excerpt}</p>
-      </div>
-      <div class="card-footer">
-        <div class="author-chip">
-          <div class="av" style="background:${p.av}">${p.author}</div>
-          <span>${p.authorName}</span>
-        </div>
-        <a href="#" class="read-link" data-id="${p.id}">${window.i18n[lang]?.read_more||'Lesen →'}</a>
-      </div>
-    </div>`;
-  }).join('');
-  attachHovers();
-}
+  /* Artikel öffnen (per Objekt oder id) */
+  const openPost = (p) => { if (p) { setActivePost(p); setMobileOpen(false); } };
+  const openPostById = (id) => { const p = posts.find((x) => String(x.id) === String(id)); if (p) openPost(p); };
 
-const filterTabs = document.getElementById('filter-tabs');
-if (filterTabs) {
-  filterTabs.addEventListener('click', e => {
-    const tab = e.target.closest('.filter-tab');
-    if (!tab) return;
-    document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
-    tab.classList.add('active');
-    renderBlog(tab.dataset.cat);
-  });
-}
+  /* Auf Home zu Abschnitt springen — nativ über location.hash (zuverlässig) */
+  const goSection = (id) => {
+    setMobileOpen(false);
+    if (view !== "home") { setView("home"); setTimeout(() => { location.hash = id; }, 40); }
+    else { location.hash = id; }
+  };
 
-/* ─── ARTICLE READER (Overlay) ─────────────────────────────
-   Öffnet den vollen content-Text eines Beitrags.
-   Styles werden hier injiziert → unabhängig von main.css.
-──────────────────────────────────────────────────────────── */
-(function injectReaderStyles(){
-  if (document.getElementById('bejoy-reader-style')) return;
-  const css = `
-  #bejoy-reader{position:fixed;inset:0;z-index:9999;display:none;}
-  #bejoy-reader.open{display:block;}
-  #bejoy-reader .reader-backdrop{position:absolute;inset:0;background:rgba(44,24,16,.55);backdrop-filter:blur(4px);}
-  #bejoy-reader .reader-panel{position:absolute;top:0;right:0;height:100%;width:min(720px,100%);
-    background:#FAF7F2;color:#2C1810;overflow-y:auto;box-shadow:-24px 0 80px rgba(44,24,16,.25);
-    transform:translateX(40px);opacity:0;transition:transform .35s ease,opacity .35s ease;}
-  #bejoy-reader.open .reader-panel{transform:translateX(0);opacity:1;}
-  #bejoy-reader .reader-hero{padding:64px 56px 28px;position:relative;}
-  #bejoy-reader .reader-emoji{font-size:56px;line-height:1;margin-bottom:18px;}
-  #bejoy-reader .reader-badge{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.08em;
-    text-transform:uppercase;padding:5px 12px;border-radius:100px;background:#E8F5F3;color:#1A7A6E;margin-bottom:18px;}
-  #bejoy-reader .reader-title{font-family:Georgia,'Playfair Display',serif;font-size:34px;line-height:1.18;margin:0 0 14px;font-weight:700;}
-  #bejoy-reader .reader-meta{font-size:14px;color:#6B6560;display:flex;gap:10px;align-items:center;}
-  #bejoy-reader .reader-meta .dot{width:4px;height:4px;border-radius:50%;background:#C9C2BA;display:inline-block;}
-  #bejoy-reader .reader-body{padding:8px 56px 80px;font-size:17px;line-height:1.72;}
-  #bejoy-reader .reader-body h2{font-family:Georgia,'Playfair Display',serif;font-size:23px;margin:34px 0 12px;color:#1A7A6E;}
-  #bejoy-reader .reader-body p{margin:0 0 18px;}
-  #bejoy-reader .reader-body strong{color:#2C1810;}
-  #bejoy-reader .reader-close{position:absolute;top:24px;right:28px;width:42px;height:42px;border:none;
-    border-radius:50%;background:#FFF;color:#2C1810;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(44,24,16,.12);
-    display:flex;align-items:center;justify-content:center;transition:transform .2s;}
-  #bejoy-reader .reader-close:hover{transform:rotate(90deg) scale(1.05);}
-  @media(max-width:600px){
-    #bejoy-reader .reader-hero{padding:56px 24px 22px;}
-    #bejoy-reader .reader-body{padding:8px 24px 64px;font-size:16px;}
-    #bejoy-reader .reader-title{font-size:27px;}
-  }`;
-  const style = document.createElement('style');
-  style.id = 'bejoy-reader-style';
-  style.textContent = css;
-  document.head.appendChild(style);
-})();
+  /* Kategorie filtern + zum Blog */
+  const filterTo = (cat) => { setFilterCat(cat); goSection("blog"); };
 
-function ensureReaderEl(){
-  let r = document.getElementById('bejoy-reader');
-  if (r) return r;
-  r = document.createElement('div');
-  r.id = 'bejoy-reader';
-  r.innerHTML = `
-    <div class="reader-backdrop" data-close="1"></div>
-    <article class="reader-panel">
-      <button class="reader-close" data-close="1" aria-label="Close">✕</button>
-      <div class="reader-hero">
-        <div class="reader-emoji"></div>
-        <span class="reader-badge"></span>
-        <h1 class="reader-title"></h1>
-        <div class="reader-meta"></div>
-      </div>
-      <div class="reader-body"></div>
-    </article>`;
-  document.body.appendChild(r);
-  r.addEventListener('click', e => { if (e.target.dataset.close) closeReader(); });
-  return r;
-}
+  /* Rechtsseiten öffnen */
+  const openLegal = (which) => { setView(which); setActivePost(null); setMobileOpen(false); window.scrollTo(0, 0); };
+  const goHome = () => { setView("home"); window.scrollTo(0, 0); };
 
-function openReader(id){
-  const post = window.posts.find(p => String(p.id) === String(id));
-  if (!post) return;
-  const d = post[currentLang] || post.de;
-  const r = ensureReaderEl();
-  r.querySelector('.reader-emoji').textContent = post.emoji;
-  const badge = r.querySelector('.reader-badge');
-  badge.textContent = catLabel(post.cat);
-  badge.style.color = post.badgeColor;
-  r.querySelector('.reader-title').textContent = d.title;
-  r.querySelector('.reader-meta').innerHTML =
-    `<span>${post.authorName}</span><span class="dot"></span><span>${post.date}</span><span class="dot"></span><span>${post.read}</span>`;
-  r.querySelector('.reader-body').innerHTML = d.content || `<p>${d.excerpt}</p>`;
-  r.querySelector('.reader-panel').scrollTop = 0;
-  r.classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeReader(){
-  const r = document.getElementById('bejoy-reader');
-  if (!r) return;
-  r.classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-/* Esc schließt den Reader */
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReader(); });
-
-/* ─── ZENTRALER KLICK-HANDLER ───
-   Ein einziger delegierter Handler für alle interaktiven Elemente.
-   Reihenfolge = Priorität.
-──────────────────────────────────────────────────────────── */
-function scrollToBlogFiltered(cat){
-  const tab = document.querySelector(`.filter-tab[data-cat="${cat}"]`);
-  if (tab) tab.click();
-  // Native, zuverlässige Navigation (auch auf iOS): Hash setzen → Browser
-  // springt zu #blog, CSS scroll-behavior macht es weich.
-  if (document.getElementById('blog')) location.hash = 'blog';
-}
-
-document.addEventListener('click', e => {
-  // 1) Sprachschalter
-  const langBtn = e.target.closest('[data-lang]');
-  if (langBtn?.dataset.lang) { e.preventDefault(); applyLang(langBtn.dataset.lang); return; }
-
-  // 2) Beitrag öffnen (Lesen-Link, AI-Karten, Wisdom-Karten, Sidebar, Blog-Karten)
-  const opener = e.target.closest('[data-open-id]');
-  if (opener) { e.preventDefault(); openReader(opener.dataset.openId); return; }
-  const readLink = e.target.closest('.read-link');
-  if (readLink) { e.preventDefault(); openReader(readLink.dataset.id); return; }
-  const blogCard = e.target.closest('.blog-card');
-  if (blogCard && blogCard.dataset.id) { e.preventDefault(); openReader(blogCard.dataset.id); return; }
-
-  // 3) Kategorie-Navigation (5 Wege, Footer-Themen, Wabi-Sabi, AI-CTA)
-  const aiAll = e.target.closest('[data-ai-all], .ai-all-link');
-  if (aiAll) { e.preventDefault(); scrollToBlogFiltered('future'); return; }
-  const catLink = e.target.closest('[data-cat-link]');
-  if (catLink) { e.preventDefault(); scrollToBlogFiltered(catLink.dataset.catLink); return; }
-
-  // 4) Reader schließen
-  if (e.target.closest('#bejoy-reader [data-close]')) { closeReader(); return; }
-
-  // 5) Cookie-Einstellungen erneut öffnen
-  if (e.target.closest('#cookie-reopen')) {
-    e.preventDefault();
-    const b = document.getElementById('cookie-banner');
-    if (b) { b.style.display=''; b.scrollIntoView?.({behavior:'smooth'}); }
-    return;
-  }
-
-  // 6) #-Anker: NATIV navigieren lassen (kein preventDefault!).
-  //    Der Browser springt zuverlässig zum Ziel; weiches Scrollen
-  //    übernimmt CSS (html { scroll-behavior: smooth }). Wir schließen
-  //    hier nur das mobile Menü. Plain-Links (Impressum etc.) laufen
-  //    ohnehin nativ, da sie keine Bedingung oben treffen.
-  const anchor = e.target.closest('a[href^="#"]');
-  if (anchor) {
-    document.getElementById('hamburger')?.classList.remove('open');
-    document.getElementById('mobile-nav')?.classList.remove('open');
-  }
-});
-
-/* ─── SIDEBAR ─── */
-function renderSidebar() {
-  const list = document.getElementById('sidebar-list');
-  if (!list) return;
-  list.innerHTML = window.sidebarPosts.map((p,i)=>
-    `<li data-open-id="${p.id}" style="cursor:pointer;"><span class="num">${String(i+1).padStart(2,'0')}</span>${p[currentLang]||p.de}</li>`
-  ).join('');
-}
-
-/* ─── READING PROGRESS ─── */
-window.addEventListener('scroll', () => {
-  const el = document.getElementById('featured');
-  if (!el) return;
-  const rect = el.getBoundingClientRect();
-  const total = el.offsetHeight - window.innerHeight;
-  const pct = total > 0 ? Math.min(Math.max(-rect.top,0)/total*100,100) : 0;
-  const bar = document.getElementById('read-progress');
-  if (bar) bar.style.width = pct.toFixed(1)+'%';
-}, {passive:true});
-
-/* ─── CURSOR ───
-   Custom-Cursor entfernt: der native Mauszeiger bleibt immer sichtbar.
-   attachHovers bleibt als No-Op erhalten, damit bestehende Aufrufe
-   (renderBlog, Init) weiterhin gefahrlos funktionieren.
-──────────────────────────────────────────────────────────── */
-function attachHovers() {}
-
-/* ─── SCROLL REVEAL ─── */
-const obs = new IntersectionObserver(entries=>{
-  entries.forEach((e,i)=>{
-    if(e.isIntersecting){
-      setTimeout(()=>e.target.classList.add('visible'), i*90);
-      obs.unobserve(e.target);
+  /* Newsletter (noch ohne Backend) */
+  const submitNl = () => {
+    const input = document.getElementById("nl-input");
+    const val = (input && input.value || "").trim();
+    if (!val || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) {
+      setNlState({ msg: t("nl_error_placeholder") || "Bitte gültige E-Mail eingeben", ok: false });
+      return;
     }
-  });
-},{threshold:0.08});
-document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+    setNlState({ msg: t("nl_success") || "Danke! Bald mehr.", ok: true });
+    if (input) input.value = "";
+  };
 
-/* ─── NAV SCROLL ─── */
-const nav = document.getElementById('main-nav');
-window.addEventListener('scroll',()=>{
-  if (nav) nav.classList.toggle('scrolled', window.scrollY>24);
-  document.getElementById('scroll-top')?.classList.toggle('visible', window.scrollY>400);
-},{passive:true});
+  /* Reveal-Animationen aktivieren + Scroll-Fortschritt + Top-Button */
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll(".reveal"));
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("visible"); io.unobserve(en.target); } });
+      }, { threshold: 0.12 });
+      els.forEach((el) => io.observe(el));
+      // Sicherheitsnetz: nach 1.2s alles sichtbar (falls IO mal nicht greift)
+      const tmr = setTimeout(() => els.forEach((el) => el.classList.add("visible")), 1200);
+      return () => { io.disconnect(); clearTimeout(tmr); };
+    } else {
+      els.forEach((el) => el.classList.add("visible"));
+    }
+  }, [view]);
 
-/* ─── HAMBURGER ─── */
-const ham = document.getElementById('hamburger');
-const mob = document.getElementById('mobile-nav');
-if (ham && mob) {
-  ham.addEventListener('click',()=>{
-    ham.classList.toggle('open');
-    mob.classList.toggle('open');
-  });
-  mob.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
-    ham.classList.remove('open'); mob.classList.remove('open');
-  }));
-}
+  useEffect(() => {
+    const onScroll = () => {
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      setProgress(max > 0 ? Math.min(100, (h.scrollTop / max) * 100) : 0);
+      setShowTop(window.scrollY > 500);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
-/* ─── SCROLL TOP ─── */
-document.getElementById('scroll-top')?.addEventListener('click',()=>
-  window.scrollTo({top:0,behavior:'smooth'}));
+  /* Body-Scroll sperren, wenn Reader offen */
+  useEffect(() => {
+    document.body.style.overflow = activePost ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [activePost]);
 
-/* ─── NEWSLETTER ─── */
-document.getElementById('nl-btn')?.addEventListener('click', function(){
-  const input = document.getElementById('nl-input');
-  const t = window.i18n[currentLang];
-  if (input.value?.includes('@')){
-    this.textContent = t.nl_success||'✓';
-    this.style.background='#1A7A6E';
-    input.value=''; input.placeholder=t.nl_success||'✓';
-  } else {
-    input.style.outline='2px solid var(--rose)';
-    input.placeholder=t.nl_error_placeholder||'Bitte E-Mail eingeben…';
-    setTimeout(()=>input.style.outline='none',2200);
+  /* ESC schließt Reader */
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") setActivePost(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /* ── Rechtsseiten-Ansicht ─────────────────────────────── */
+  if (view === "impressum" || view === "datenschutz") {
+    return (
+      <div className="legal-page">
+        <div className="wrap">
+          <button className="back" onClick={goHome}>← Zurück zu BeJoy</button>
+          <div dangerouslySetInnerHTML={{ __html: view === "impressum" ? impressumHTML : datenschutzHTML }} />
+        </div>
+      </div>
+    );
   }
-});
 
-/* ─── COOKIE ─── */
-const banner = document.getElementById('cookie-banner');
-if (banner && localStorage.getItem('bejoy_cookie')) banner.style.display='none';
-document.getElementById('cookie-accept')?.addEventListener('click',()=>{
-  localStorage.setItem('bejoy_cookie','accepted'); if(banner) banner.style.display='none';
-});
-document.getElementById('cookie-decline')?.addEventListener('click',()=>{
-  localStorage.setItem('bejoy_cookie','declined'); if(banner) banner.style.display='none';
-});
-/* (Cookie-Einstellungen-erneut-öffnen wird im zentralen Klick-Handler behandelt) */
+  const featuredPost = posts.find((p) => p.wide) || posts[0];
+  const visiblePosts = filterCat === "all" ? posts : posts.filter((p) => p.cat === filterCat);
 
-/* ─── INIT ─── */
-try {
-  applyLang(currentLang);
-  attachHovers();
-} catch (err) {
-  console.error('[BeJoy] Init-Fehler:', err);
-  // Selbst wenn das Init teilweise scheitert, bleibt der zentrale
-  // Klick-Handler aktiv → Navigation funktioniert weiter.
+  const filterTabs = [
+    ["all", "filter_all"], ["mindful", "filter_mindful"], ["joyful", "filter_joyful"],
+    ["resilient", "filter_resilient"], ["future", "filter_future"], ["worldwide", "filter_world"],
+  ];
+
+  const cats = [
+    { id: "mindful", icon: "🧘", c: "teal", n: "c1_name", d: "c1_desc", l: "c1_link" },
+    { id: "joyful", icon: "✨", c: "joy", n: "c2_name", d: "c2_desc", l: "c2_link" },
+    { id: "resilient", icon: "💪", c: "rose", n: "c3_name", d: "c3_desc", l: "c3_link" },
+    { id: "future", icon: "🤖", c: "earth", n: "c4_name", d: "c4_desc", l: "c4_link" },
+    { id: "worldwide", icon: "🌍", c: "warm", n: "c5_name", d: "c5_desc", l: "c5_link" },
+  ];
+
+  const aiCards = [
+    { id: "11", emoji: "🧠", h: "ai1_h", p: "ai1_p" },
+    { id: "12", emoji: "🎨", h: "ai2_h", p: "ai2_p" },
+    { id: "3", emoji: "📵", h: "ai3_h", p: "ai3_p" },
+    { id: "7", emoji: "🌱", h: "ai4_h", p: "ai4_p" },
+  ];
+
+  const wisdom = [
+    { id: "8", emoji: "☀️", origin: "Japan", word: "Ikigai", meaning: "Der Grund aufzustehen — die Schnittmenge von Leidenschaft, Berufung, Mission und Beruf." },
+    { id: "9", emoji: "🕯️", origin: "Dänemark", word: "Hygge", meaning: "Behaglichkeit und Gemütlichkeit — das Gefühl von Wärme, Geborgenheit und Zusammensein." },
+    { id: "10", emoji: "🌿", origin: "Afrika", word: "Ubuntu", meaning: "„Ich bin, weil wir sind.\" — Menschlichkeit durch Verbundenheit mit anderen." },
+    { id: null, emoji: "🌸", origin: "Japan", word: "Wabi-Sabi", meaning: "Schönheit im Unvollkommenen, Vergänglichen und Unvollständigen." },
+  ];
+
+  return (
+    <>
+      {/* ── NAV ─────────────────────────────────────────── */}
+      <nav id="main-nav">
+        <button className="logo-wrap" onClick={goHome} aria-label="BeJoy Home" style={{ background: "none", border: "none", cursor: "pointer" }}>
+          <Logo />
+          <span className="logo-text">Be<span>Joy</span></span>
+        </button>
+        <nav className="nav-links">
+          <a href="#categories" onClick={() => setMobileOpen(false)}>{t("nav_topics")}</a>
+          <a href="#blog" onClick={() => setMobileOpen(false)}>{t("nav_blog")}</a>
+          <a href="#ai" onClick={() => setMobileOpen(false)}>{t("nav_ai")}</a>
+          <a href="#newsletter" onClick={() => setMobileOpen(false)}>{t("nav_newsletter")}</a>
+        </nav>
+        <div className="nav-right">
+          <div className="lang-switcher" role="group" aria-label="Language">
+            {LANGS.map((l) => (
+              <button key={l} className={`lang-btn ${lang === l ? "active" : ""}`} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>
+            ))}
+          </div>
+          <a href="#newsletter" className="nav-cta">{t("nav_cta")}</a>
+        </div>
+        <button className={`hamburger ${mobileOpen ? "open" : ""}`} aria-label="Menu" onClick={() => setMobileOpen((v) => !v)}>
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+
+      {/* Mobile-Menü */}
+      <div className={`mobile-nav ${mobileOpen ? "open" : ""}`} id="mobile-nav">
+        <a href="#categories" onClick={() => setMobileOpen(false)}>{t("nav_topics")}</a>
+        <a href="#blog" onClick={() => setMobileOpen(false)}>{t("nav_blog")}</a>
+        <a href="#ai" onClick={() => setMobileOpen(false)}>{t("nav_ai")}</a>
+        <a href="#newsletter" onClick={() => setMobileOpen(false)}>{t("nav_newsletter")}</a>
+        <div className="lang-switcher">
+          {LANGS.map((l) => (
+            <button key={l} className={`lang-btn ${lang === l ? "active" : ""}`} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── HERO ────────────────────────────────────────── */}
+      <section className="hero" id="home">
+        <div className="hero-bg"></div>
+        <div className="orb orb-1"></div><div className="orb orb-2"></div><div className="orb orb-3"></div>
+        <div className="hero-content">
+          <div className="hero-badge">{t("hero_badge")}</div>
+          <h1>
+            <span>{t("hero_h1_l1")}</span><br />
+            <em>{t("hero_h1_l2")}</em><br />
+            <span className="acc">{t("hero_h1_l3")}</span>
+          </h1>
+          <p className="hero-sub">{t("hero_sub")}</p>
+          <div className="hero-actions">
+            <a href="#blog" className="btn-primary"><span>{t("hero_cta")}</span> <span className="arr">→</span></a>
+            <a href="#categories" className="btn-ghost"><span>{t("hero_ghost")}</span> ↓</a>
+          </div>
+          <div className="hero-stats">
+            <div><div className="stat-num">{t("stat1_n")}</div><div className="stat-label">{t("stat1_l")}</div></div>
+            <div><div className="stat-num">{t("stat2_n")}</div><div className="stat-label">{t("stat2_l")}</div></div>
+            <div><div className="stat-num">{t("stat3_n")}</div><div className="stat-label">{t("stat3_l")}</div></div>
+          </div>
+        </div>
+        <div className="hero-visual" aria-hidden="true">
+          <div className="orbit-ring">
+            <div className="orbit-card oc-top"><div className="oc-emoji">🧘</div><div className="oc-label">Mindful</div></div>
+            <div className="orbit-card oc-right"><div className="oc-emoji">🌍</div><div className="oc-label">Worldwide</div></div>
+            <div className="orbit-card oc-bottom"><div className="oc-emoji">🤖</div><div className="oc-label">Future-Self</div></div>
+            <div className="orbit-card oc-left"><div className="oc-emoji">💪</div><div className="oc-label">Resilient</div></div>
+            <div className="orbit-inner"><Logo /></div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── KATEGORIEN ──────────────────────────────────── */}
+      <section className="categories" id="categories">
+        <div className="section-head reveal">
+          <span className="section-tag">{t("section_topics")}</span>
+          <h2>{t("topics_h")}</h2>
+          <p>{t("topics_p")}</p>
+        </div>
+        <div className="cat-grid reveal">
+          {cats.map((c) => (
+            <div key={c.id} className="cat-card" data-c={c.c} onClick={() => filterTo(c.id)} style={{ cursor: "pointer" }}>
+              <div className="cat-icon">{c.icon}</div>
+              <div className="cat-name">{t(c.n)}</div>
+              <div className="cat-desc">{t(c.d)}</div>
+              <span className="cat-link">{t(c.l)}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FEATURED ────────────────────────────────────── */}
+      <section className="featured-section" id="featured">
+        <div className="featured-inner">
+          <div className="featured-left reveal">
+            <div className="featured-label">{t("feat_label")}</div>
+            <h2 style={{ cursor: "pointer" }} onClick={() => openPost(featuredPost)}>{t("feat_h")}</h2>
+            <div className="featured-meta">
+              <div className="author-chip"><div className="av" style={{ background: "var(--teal)" }}>BJ</div><span>BeJoy Redaktion</span></div>
+              <span className="dot"></span><span>{t("feat_read")}</span>
+            </div>
+            <div className="featured-body">
+              <p>{t("feat_p1")}</p>
+              <blockquote>{t("feat_quote")}</blockquote>
+              <p>{t("feat_p2")}</p>
+              <p>{t("feat_p3")}</p>
+            </div>
+            <div className="featured-tags">
+              <span className="featured-tag">{t("feat_tag1")}</span>
+              <span className="featured-tag">{t("feat_tag2")}</span>
+              <span className="featured-tag">{t("feat_tag3")}</span>
+              <span className="featured-tag">{t("feat_tag4")}</span>
+            </div>
+            <div style={{ marginTop: 22 }}>
+              <button className="btn-primary" onClick={() => openPost(featuredPost)}><span>{t("read_more")}</span> <span className="arr">→</span></button>
+            </div>
+          </div>
+          <div className="featured-sidebar reveal">
+            <div className="sidebar-card">
+              <div className="progress-bar"><div className="progress-fill" style={{ width: progress + "%" }}></div></div>
+              <p className="read-time">{t("sidebar_prog")}</p>
+            </div>
+            <div className="sidebar-card">
+              <h4>{t("sidebar_also")}</h4>
+              <ul className="sidebar-list">
+                {sidebarPosts.map((s) => (
+                  <li key={s.id}><button onClick={() => openPostById(s.id)}>{s[lang] || s.de}</button></li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── BLOG ────────────────────────────────────────── */}
+      <section className="blog" id="blog">
+        <div className="section-head reveal">
+          <span className="section-tag">{t("section_blog")}</span>
+          <h2>{t("blog_h")}</h2>
+          <p>{t("blog_p")}</p>
+        </div>
+        <div className="blog-controls reveal">
+          <div className="filter-tabs">
+            {filterTabs.map(([cat, key]) => (
+              <button key={cat} className={`filter-tab ${filterCat === cat ? "active" : ""}`} onClick={() => setFilterCat(cat)}>{t(key)}</button>
+            ))}
+          </div>
+        </div>
+        <div className="blog-grid">
+          {visiblePosts.map((p) => {
+            const d = p[lang] || p.de;
+            return (
+              <article key={p.id} className={`blog-card ${p.wide ? "wide" : ""}`} onClick={() => openPost(p)}>
+                <div className="card-thumb">
+                  <div className="thumb-bg" style={{ background: p.bg }}>{p.emoji}</div>
+                  <div className="card-badge" style={{ color: p.badgeColor }}>{catLabel(p.cat)}</div>
+                </div>
+                <div className="card-body">
+                  <div className="card-meta"><span>{p.date}</span><span className="dot"></span><span>{p.read}</span></div>
+                  <h3>{d.title}</h3>
+                  <p>{d.excerpt}</p>
+                </div>
+                <div className="card-footer">
+                  <div className="author-chip"><div className="av" style={{ background: p.av }}>{p.author}</div><span>{p.authorName}</span></div>
+                  <span className="read-link">{t("read_more")} →</span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ── KI / FUTURE-SELF ────────────────────────────── */}
+      <section className="ai-world" id="ai">
+        <div className="ai-world-bg"></div>
+        <div className="ai-inner">
+          <div className="ai-left reveal">
+            <span className="section-tag">{t("section_ai")}</span>
+            <h2 dangerouslySetInnerHTML={{ __html: t("ai_h").replace("KI-Welt", "<em>" + (t("ai_em") || "KI-Welt") + "</em>") }} />
+            <p>{t("ai_p")}</p>
+            <button className="btn-primary" style={{ background: "var(--joy)", color: "var(--earth)" }} onClick={() => filterTo("future")}>
+              <span>{t("ai_cta")}</span> <span className="arr">→</span>
+            </button>
+          </div>
+          <div className="ai-grid reveal">
+            {aiCards.map((c) => (
+              <div key={c.id} className="ai-card" style={{ cursor: "pointer" }} onClick={() => openPostById(c.id)}>
+                <span className="emoji">{c.emoji}</span><h4>{t(c.h)}</h4><p>{t(c.p)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── WORLD WISDOM ────────────────────────────────── */}
+      <section className="wisdom" id="wisdom">
+        <div className="section-head reveal">
+          <span className="section-tag">{t("section_wisdom")}</span>
+          <h2>{t("wisdom_h")}</h2>
+          <p>{t("wisdom_p")}</p>
+        </div>
+        <div className="wisdom-grid reveal">
+          {wisdom.map((w, i) => (
+            <div key={i} className="wisdom-card" style={{ cursor: "pointer" }}
+              onClick={() => (w.id ? openPostById(w.id) : filterTo("worldwide"))}>
+              <div className="wisdom-bg"></div>
+              <div className="wisdom-big-emoji">{w.emoji}</div>
+              <div className="wisdom-origin">{w.origin}</div>
+              <div className="wisdom-word">{w.word}</div>
+              <div className="wisdom-meaning">{w.meaning}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── NEWSLETTER ──────────────────────────────────── */}
+      <section className="newsletter" id="newsletter">
+        <div className="nl-inner reveal">
+          <span className="section-tag">{t("section_nl")}</span>
+          <h2>{t("nl_h")}</h2>
+          <p>{t("nl_p")}</p>
+          <div className="nl-form">
+            <input type="email" id="nl-input" placeholder={t("nl_placeholder")} autoComplete="email" />
+            <button type="button" onClick={submitNl}>{t("nl_btn")}</button>
+          </div>
+          {nlState.msg
+            ? <p className="nl-note" style={{ color: nlState.ok ? "var(--teal)" : "var(--rose)", fontWeight: 600 }}>{nlState.msg}</p>
+            : <p className="nl-note">{t("nl_note")}</p>}
+        </div>
+      </section>
+
+      {/* ── ÜBER UNS ────────────────────────────────────── */}
+      <section className="about-section" id="about" style={{ padding: "88px 24px", background: "var(--cream,#FAF7F2)" }}>
+        <div className="about-inner reveal" style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
+          <span className="section-tag" style={{ color: "var(--teal,#1A7A6E)" }}>{t("section_about")}</span>
+          <h2 style={{ fontFamily: "Georgia,'Playfair Display',serif", fontSize: "clamp(26px,4vw,38px)", margin: "14px 0 22px", color: "var(--earth,#2C1810)" }}>{t("about_h")}</h2>
+          <p style={{ fontSize: 18, lineHeight: 1.7, color: "var(--gray,#6B6560)", margin: "0 auto 36px", maxWidth: 620 }}>{t("about_p")}</p>
+          <a href="https://www.cleebration.com" target="_blank" rel="noopener noreferrer" style={{ display: "inline-block" }} aria-label="cleebration — zur Website">
+            <img src="/cleebration-logo.jpg" alt="cleebration Logo" style={{ maxWidth: 280, width: "100%", height: "auto" }} loading="lazy" />
+          </a>
+          <p style={{ marginTop: 14, fontSize: 14, color: "var(--gray,#6B6560)" }}>
+            <a href="https://www.cleebration.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--teal,#1A7A6E)", textDecoration: "none" }}>www.cleebration.com →</a>
+          </p>
+        </div>
+      </section>
+
+      {/* ── FOOTER ──────────────────────────────────────── */}
+      <footer>
+        <div className="footer-langbar">
+          <span className="footer-langbar-label">{lang === "de" ? "Sprache" : lang === "es" ? "Idioma" : "Language"}</span>
+          <div className="footer-lang">
+            {LANGS.map((l) => (
+              <button key={l} className={lang === l ? "active" : ""} onClick={() => changeLang(l)}>
+                {l === "de" ? "Deutsch" : l === "en" ? "English" : "Español"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="footer-top">
+          <div className="footer-brand">
+            <button className="logo-wrap" onClick={goHome} style={{ background: "none", border: "none", cursor: "pointer" }}>
+              <Logo /><span className="logo-text">Be<span>Joy</span></span>
+            </button>
+            <p>{t("footer_tagline")}</p>
+            <div className="social-row">
+              <a className="social-btn" href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">📸</a>
+              <a className="social-btn" href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">💼</a>
+              <a className="social-btn" href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube">▶️</a>
+              <a className="social-btn" href="https://tiktok.com" target="_blank" rel="noopener noreferrer" aria-label="TikTok">🎵</a>
+            </div>
+          </div>
+          <div className="footer-col">
+            <h5>{t("footer_h_topics")}</h5>
+            <ul>
+              {cats.map((c) => (
+                <li key={c.id}><button onClick={() => filterTo(c.id)}>{t(c.n)}</button></li>
+              ))}
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h5>{t("footer_h_bejoy")}</h5>
+            <ul>
+              <li><a href="#about" onClick={() => setMobileOpen(false)}>{t("footer_about")}</a></li>
+              <li><a href="#blog" onClick={() => setMobileOpen(false)}>{t("footer_blog")}</a></li>
+              <li><a href="#newsletter" onClick={() => setMobileOpen(false)}>{t("footer_nl")}</a></li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h5>{t("footer_h_legal")}</h5>
+            <ul>
+              <li><button onClick={() => openLegal("impressum")}>{t("footer_imprint")}</button></li>
+              <li><button onClick={() => openLegal("datenschutz")}>{t("footer_privacy")}</button></li>
+              <li><button onClick={() => { try { localStorage.removeItem("bejoy_cookie"); } catch (e) {} setCookie(null); }}>{t("footer_cookies")}</button></li>
+            </ul>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <p>{t("footer_copy")}</p>
+        </div>
+      </footer>
+
+      {/* ── COOKIE-BANNER ───────────────────────────────── */}
+      {cookie !== "accepted" && cookie !== "declined" && (
+        <div id="cookie-banner" role="dialog" aria-label="Cookie consent">
+          <p>{t("cookie_text")}</p>
+          <div className="cookie-btns">
+            <button className="cookie-accept" onClick={() => { try { localStorage.setItem("bejoy_cookie", "accepted"); } catch (e) {} setCookie("accepted"); }}>{t("cookie_accept")}</button>
+            <button className="cookie-decline" onClick={() => { try { localStorage.setItem("bejoy_cookie", "declined"); } catch (e) {} setCookie("declined"); }}>{t("cookie_decline")}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── SCROLL-TOP ──────────────────────────────────── */}
+      <button id="scroll-top" className={showTop ? "visible" : ""} aria-label="Scroll to top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>↑</button>
+
+      {/* ── READER (Artikel) ────────────────────────────── */}
+      {activePost && (() => {
+        const d = activePost[lang] || activePost.de;
+        return (
+          <div className="reader" role="dialog" aria-modal="true">
+            <div className="reader-backdrop" onClick={() => setActivePost(null)}></div>
+            <article className="reader-panel">
+              <button className="reader-close" aria-label="Close" onClick={() => setActivePost(null)}>✕</button>
+              <div className="reader-hero">
+                <div className="reader-emoji">{activePost.emoji}</div>
+                <span className="reader-badge" style={{ color: activePost.badgeColor }}>{catLabel(activePost.cat)}</span>
+                <h1 className="reader-title">{d.title}</h1>
+                <div className="reader-meta">
+                  <span>{activePost.authorName}</span><span className="dot"></span>
+                  <span>{activePost.date}</span><span className="dot"></span><span>{activePost.read}</span>
+                </div>
+              </div>
+              <div className="reader-body" dangerouslySetInnerHTML={{ __html: d.content || `<p>${d.excerpt}</p>` }} />
+            </article>
+          </div>
+        );
+      })()}
+    </>
+  );
 }
