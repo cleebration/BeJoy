@@ -35,6 +35,7 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showTop, setShowTop] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const [nlState, setNlState] = useState({ msg: "", ok: null });
   const [cookie, setCookie] = useState(() => {
     try { return localStorage.getItem("bejoy_cookie"); } catch (e) { return "x"; }
@@ -106,6 +107,7 @@ export default function App() {
       const max = h.scrollHeight - h.clientHeight;
       setProgress(max > 0 ? Math.min(100, (h.scrollTop / max) * 100) : 0);
       setShowTop(window.scrollY > 500);
+      setScrolled(window.scrollY > 20);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
@@ -170,17 +172,17 @@ export default function App() {
   return (
     <>
       {/* ── NAV ─────────────────────────────────────────── */}
-      <nav id="main-nav">
+      <nav id="main-nav" className={scrolled ? "scrolled" : ""}>
         <button className="logo-wrap" onClick={goHome} aria-label="BeJoy Home" style={{ background: "none", border: "none", cursor: "pointer" }}>
           <Logo />
           <span className="logo-text">Be<span>Joy</span></span>
         </button>
-        <nav className="nav-links">
+        <div className="nav-links">
           <a href="#categories" onClick={() => setMobileOpen(false)}>{t("nav_topics")}</a>
           <a href="#blog" onClick={() => setMobileOpen(false)}>{t("nav_blog")}</a>
           <a href="#ai" onClick={() => setMobileOpen(false)}>{t("nav_ai")}</a>
           <a href="#newsletter" onClick={() => setMobileOpen(false)}>{t("nav_newsletter")}</a>
-        </nav>
+        </div>
         <div className="nav-right">
           <div className="lang-switcher" role="group" aria-label="Language">
             {LANGS.map((l) => (
