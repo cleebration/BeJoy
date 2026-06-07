@@ -705,7 +705,7 @@ footer {
 }
 .footer-brand .logo-text { color: var(--cream); }
 .footer-brand p {
-  color: rgba(250,247,242,.45); font-size: 14px; line-height: 1.75;
+  color: rgba(250,247,242,.5); font-size: 16px; line-height: 1.75;
   margin-top: 18px; font-weight: 300; max-width: 280px;
 }
 .footer-brand .social-row { display: flex; gap: 10px; margin-top: 24px; }
@@ -718,29 +718,50 @@ footer {
 .social-btn:hover { background: var(--joy); transform: translateY(-2px); }
 
 .footer-col h5 {
-  font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
-  text-transform: uppercase; color: rgba(250,247,242,.35); margin-bottom: 20px;
+  font-size: 14px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: rgba(250,247,242,.45); margin-bottom: 22px;
 }
-.footer-col li { margin-bottom: 10px; }
-.footer-col a {
-  font-size: 14px; color: rgba(250,247,242,.6);
+.footer-col li { margin-bottom: 13px; }
+.footer-col a,
+.footer-col button {
+  font-size: 17px; color: rgba(250,247,242,.72);
   transition: color .2s;
+  background: none; border: none; padding: 0; margin: 0;
+  font-family: inherit; text-align: left; cursor: pointer; line-height: 1.4;
 }
-.footer-col a:hover { color: var(--joy); }
+.footer-col a:hover,
+.footer-col button:hover { color: var(--joy); }
 
 .footer-bottom {
   padding-top: 28px; border-top: 1px solid rgba(250,247,242,.08);
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+  display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; text-align: center;
 }
 .footer-bottom p { font-size: 13px; color: rgba(250,247,242,.3); }
-.footer-lang { display: flex; gap: 6px; }
-.footer-lang a {
-  font-size: 12px; color: rgba(250,247,242,.35);
-  padding: 4px 10px; border-radius: 100px;
-  border: 1px solid rgba(250,247,242,.1);
+
+/* Sprachleiste oben im Footer */
+.footer-langbar {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 14px; padding-bottom: 40px; margin-bottom: 44px;
+  border-bottom: 1px solid rgba(250,247,242,.1);
+}
+.footer-langbar-label {
+  font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+  color: rgba(250,247,242,.4); font-weight: 600;
+}
+.footer-lang { display: flex; gap: 10px; flex-wrap: wrap; }
+.footer-lang button {
+  font-size: 16px; font-weight: 500;
+  color: rgba(250,247,242,.7); background: rgba(250,247,242,.06);
+  padding: 9px 20px; border-radius: 100px;
+  border: 1px solid rgba(250,247,242,.14);
+  font-family: inherit; cursor: pointer;
   transition: all .2s;
 }
-.footer-lang a:hover { color: var(--joy); border-color: var(--joy); }
+.footer-lang button:hover { color: var(--cream); border-color: var(--joy); }
+.footer-lang button.active {
+  background: var(--joy); color: var(--earth);
+  border-color: var(--joy); font-weight: 700;
+}
 
 /* ═══════════════════════════════════════════
    COOKIE BANNER
