@@ -338,3 +338,60 @@ try {
   // Selbst wenn das Init teilweise scheitert, bleibt der zentrale
   // Klick-Handler aktiv → Navigation funktioniert weiter.
 }
+
+/* ─────────────────────────────────────────────────────────────
+   KLICK-FIX + SELBSTDIAGNOSE (temporär, Juni 2026)
+   1) Erzwingt: dekorative Ebenen fangen keine Klicks ab.
+   2) Zeigt sichtbar auf der Seite, ob/was über den Links liegt.
+   Wieder entfernen, sobald die Ursache klar ist.
+───────────────────────────────────────────────────────────── */
+(function(){
+  var fix = document.createElement('style');
+  fix.id = 'bejoy-click-fix';
+  fix.textContent =
+    '.hero-bg,.ai-world-bg,.wisdom-bg,.orb,.featured-section::before,' +
+    '.cat-card::before,.ticker::before,.ticker::after,' +
+    '.hero-badge::before,.nav-links a::after,.featured-label::before' +
+    '{pointer-events:none !important;}' +
+    'a,button,input,label,nav,.nav-links,.nav-links a,footer,.footer-col a,' +
+    '.blog-card,.cat-card,.wisdom-card,.ai-card,.read-link,' +
+    '[data-open-id],[data-cat-link],[data-lang]{pointer-events:auto !important;}';
+  document.head.appendChild(fix);
+
+  function diagnose(){
+    var checks = [
+      ['Menue Blog',       document.querySelector('a[href="#blog"]')],
+      ['Footer Impressum', document.querySelector('footer a[href*="impressum"]')],
+      ['Blog-Karte',       document.querySelector('.blog-card')]
+    ];
+    var problems = [];
+    checks.forEach(function(c){
+      var name = c[0], el = c[1];
+      if(!el) return;
+      var r = el.getBoundingClientRect();
+      if(r.width === 0 || r.height === 0) return;
+      var top = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2);
+      if(top && top !== el && !el.contains(top) && !top.contains(el)){
+        var id  = top.id ? '#'+top.id : '';
+        var cls = (top.className && top.className.toString)
+          ? '.'+top.className.toString().trim().split(/\s+/).join('.') : '';
+        problems.push(name + ' -> ' + top.tagName.toLowerCase() + id + cls);
+      }
+    });
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;' +
+      'pointer-events:none;font:13px/1.4 system-ui,sans-serif;padding:9px 13px;text-align:left;color:#fff;';
+    if(problems.length){
+      box.style.background = '#B00020';
+      box.textContent = 'KLICK-BLOCKER: ' + problems.join('   |   ');
+    } else {
+      box.style.background = '#1A7A6E';
+      box.textContent = 'Klick-Check OK – kein Element liegt ueber den Links.';
+    }
+    document.body.appendChild(box);
+    setTimeout(function(){ box.style.transition='opacity .6s'; box.style.opacity='0';
+      setTimeout(function(){ box.remove(); }, 800); }, 9000);
+  }
+  if(document.readyState === 'complete') setTimeout(diagnose, 500);
+  else window.addEventListener('load', function(){ setTimeout(diagnose, 500); });
+})();
