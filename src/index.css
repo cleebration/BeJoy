@@ -1,519 +1,919 @@
-import { useState, useEffect, useCallback } from "react";
-import { i18n } from "./i18n.js";
-import { posts, sidebarPosts } from "./data.js";
-import { impressumHTML, datenschutzHTML } from "./legal.js";
+/* BeJoy — Main Stylesheet
+ * Auto-extracted from index.html
+ * Edit here, changes apply site-wide
+ */
 
-/* ─────────────────────────────────────────────────────────────
-   BeJoy — React/Vite (Architektur nach DerNachruf).
-   Navigation läuft komplett über React-State (onClick) bzw.
-   native Anker-Links. KEIN preventDefault, KEIN scrollIntoView,
-   keine document-Klick-Delegation → Klicks funktionieren überall.
-───────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════ */
+:root {
+  --joy:        #F5A623;
+  --joy-dark:   #D4891A;
+  --joy-pale:   #FFF8EC;
+  --teal:       #1A7A6E;
+  --teal-light: #2A9D8F;
+  --teal-pale:  #E8F5F3;
+  --cream:      #FAF7F2;
+  --earth:      #2C1810;
+  --rose:       #E8856A;
+  --rose-pale:  #FDF0EB;
+  --gray:       #6B6560;
+  --light:      #F0EDE8;
+  --white:      #FFFFFF;
 
-const LANGS = ["de", "en", "es"];
+  --radius-sm:  8px;
+  --radius-md:  16px;
+  --radius-lg:  24px;
+  --radius-xl:  100px;
 
-const Logo = () => (
-  <svg className="logo-svg" viewBox="0 0 42 42" fill="none" aria-label="BeJoy Logo">
-    <g opacity=".88">
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-        <ellipse key={deg} cx="21" cy="8" rx="2.2" ry="4.5" fill="#F5A623" transform={`rotate(${deg} 21 21)`} />
-      ))}
-    </g>
-    <circle cx="21" cy="21" r="9.5" fill="#1A7A6E" />
-    <text x="16.5" y="25.5" fontFamily="Georgia,serif" fontSize="12" fontWeight="700" fill="#FAF7F2">B</text>
-  </svg>
-);
+  --shadow-sm:  0 2px 12px rgba(44,24,16,0.06);
+  --shadow-md:  0 8px 32px rgba(44,24,16,0.10);
+  --shadow-lg:  0 24px 80px rgba(44,24,16,0.13);
 
-export default function App() {
-  const [lang, setLang] = useState(() => {
-    try { const s = localStorage.getItem("bejoy_lang"); if (LANGS.includes(s)) return s; } catch (e) {}
-    return "de";
-  });
-  const [view, setView] = useState("home");          // home | impressum | datenschutz
-  const [activePost, setActivePost] = useState(null); // Artikel-Reader
-  const [filterCat, setFilterCat] = useState("all");
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [showTop, setShowTop] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [nlState, setNlState] = useState({ msg: "", ok: null });
-  const [cookie, setCookie] = useState(() => {
-    try { return localStorage.getItem("bejoy_cookie"); } catch (e) { return "x"; }
-  });
-
-  const t = useCallback((k) => (i18n[lang] && i18n[lang][k]) ?? i18n.de[k] ?? k, [lang]);
-
-  const catLabel = useCallback((cat) => {
-    const map = { mindful: "filter_mindful", joyful: "filter_joyful", resilient: "filter_resilient", future: "filter_future", worldwide: "filter_world" };
-    return t(map[cat] || "filter_all");
-  }, [t]);
-
-  /* Sprache wechseln + merken */
-  const changeLang = (l) => {
-    setLang(l);
-    try { localStorage.setItem("bejoy_lang", l); } catch (e) {}
-    document.documentElement.lang = l;
-  };
-
-  /* Artikel öffnen (per Objekt oder id) */
-  const openPost = (p) => { if (p) { setActivePost(p); setMobileOpen(false); } };
-  const openPostById = (id) => { const p = posts.find((x) => String(x.id) === String(id)); if (p) openPost(p); };
-
-  /* Auf Home zu Abschnitt springen — nativ über location.hash (zuverlässig) */
-  const goSection = (id) => {
-    setMobileOpen(false);
-    if (view !== "home") { setView("home"); setTimeout(() => { location.hash = id; }, 40); }
-    else { location.hash = id; }
-  };
-
-  /* Kategorie filtern + zum Blog */
-  const filterTo = (cat) => { setFilterCat(cat); goSection("blog"); };
-
-  /* Rechtsseiten öffnen */
-  const openLegal = (which) => { setView(which); setActivePost(null); setMobileOpen(false); window.scrollTo(0, 0); };
-  const goHome = () => { setView("home"); window.scrollTo(0, 0); };
-
-  /* Newsletter (noch ohne Backend) */
-  const submitNl = () => {
-    const input = document.getElementById("nl-input");
-    const val = (input && input.value || "").trim();
-    if (!val || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) {
-      setNlState({ msg: t("nl_error_placeholder") || "Bitte gültige E-Mail eingeben", ok: false });
-      return;
-    }
-    setNlState({ msg: t("nl_success") || "Danke! Bald mehr.", ok: true });
-    if (input) input.value = "";
-  };
-
-  /* Reveal-Animationen aktivieren + Scroll-Fortschritt + Top-Button */
-  useEffect(() => {
-    const els = Array.from(document.querySelectorAll(".reveal"));
-    if ("IntersectionObserver" in window) {
-      const io = new IntersectionObserver((entries) => {
-        entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("visible"); io.unobserve(en.target); } });
-      }, { threshold: 0.12 });
-      els.forEach((el) => io.observe(el));
-      // Sicherheitsnetz: nach 1.2s alles sichtbar (falls IO mal nicht greift)
-      const tmr = setTimeout(() => els.forEach((el) => el.classList.add("visible")), 1200);
-      return () => { io.disconnect(); clearTimeout(tmr); };
-    } else {
-      els.forEach((el) => el.classList.add("visible"));
-    }
-  }, [view]);
-
-  useEffect(() => {
-    const onScroll = () => {
-      const h = document.documentElement;
-      const max = h.scrollHeight - h.clientHeight;
-      setProgress(max > 0 ? Math.min(100, (h.scrollTop / max) * 100) : 0);
-      setShowTop(window.scrollY > 500);
-      setScrolled(window.scrollY > 20);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  /* Body-Scroll sperren, wenn Reader offen */
-  useEffect(() => {
-    document.body.style.overflow = activePost ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [activePost]);
-
-  /* ESC schließt Reader */
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") setActivePost(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  /* ── Rechtsseiten-Ansicht ─────────────────────────────── */
-  if (view === "impressum" || view === "datenschutz") {
-    return (
-      <div className="legal-page">
-        <div className="wrap">
-          <button className="back" onClick={goHome}>← Zurück zu BeJoy</button>
-          <div dangerouslySetInnerHTML={{ __html: view === "impressum" ? impressumHTML : datenschutzHTML }} />
-        </div>
-      </div>
-    );
-  }
-
-  const featuredPost = posts.find((p) => p.wide) || posts[0];
-  const visiblePosts = filterCat === "all" ? posts : posts.filter((p) => p.cat === filterCat);
-
-  const filterTabs = [
-    ["all", "filter_all"], ["mindful", "filter_mindful"], ["joyful", "filter_joyful"],
-    ["resilient", "filter_resilient"], ["future", "filter_future"], ["worldwide", "filter_world"],
-  ];
-
-  const cats = [
-    { id: "mindful", icon: "🧘", c: "teal", n: "c1_name", d: "c1_desc", l: "c1_link" },
-    { id: "joyful", icon: "✨", c: "joy", n: "c2_name", d: "c2_desc", l: "c2_link" },
-    { id: "resilient", icon: "💪", c: "rose", n: "c3_name", d: "c3_desc", l: "c3_link" },
-    { id: "future", icon: "🤖", c: "earth", n: "c4_name", d: "c4_desc", l: "c4_link" },
-    { id: "worldwide", icon: "🌍", c: "warm", n: "c5_name", d: "c5_desc", l: "c5_link" },
-  ];
-
-  const aiCards = [
-    { id: "11", emoji: "🧠", h: "ai1_h", p: "ai1_p" },
-    { id: "12", emoji: "🎨", h: "ai2_h", p: "ai2_p" },
-    { id: "3", emoji: "📵", h: "ai3_h", p: "ai3_p" },
-    { id: "7", emoji: "🌱", h: "ai4_h", p: "ai4_p" },
-  ];
-
-  const wisdom = [
-    { id: "8", emoji: "☀️", origin: "Japan", word: "Ikigai", meaning: "Der Grund aufzustehen — die Schnittmenge von Leidenschaft, Berufung, Mission und Beruf." },
-    { id: "9", emoji: "🕯️", origin: "Dänemark", word: "Hygge", meaning: "Behaglichkeit und Gemütlichkeit — das Gefühl von Wärme, Geborgenheit und Zusammensein." },
-    { id: "10", emoji: "🌿", origin: "Afrika", word: "Ubuntu", meaning: "„Ich bin, weil wir sind.\" — Menschlichkeit durch Verbundenheit mit anderen." },
-    { id: null, emoji: "🌸", origin: "Japan", word: "Wabi-Sabi", meaning: "Schönheit im Unvollkommenen, Vergänglichen und Unvollständigen." },
-  ];
-
-  return (
-    <>
-      {/* ── NAV ─────────────────────────────────────────── */}
-      <nav id="main-nav" className={scrolled ? "scrolled" : ""}>
-        <button className="logo-wrap" onClick={goHome} aria-label="BeJoy Home" style={{ background: "none", border: "none", cursor: "pointer" }}>
-          <Logo />
-          <span className="logo-text">Be<span>Joy</span></span>
-        </button>
-        <div className="nav-links">
-          <a href="#categories" onClick={() => setMobileOpen(false)}>{t("nav_topics")}</a>
-          <a href="#blog" onClick={() => setMobileOpen(false)}>{t("nav_blog")}</a>
-          <a href="#ai" onClick={() => setMobileOpen(false)}>{t("nav_ai")}</a>
-          <a href="#newsletter" onClick={() => setMobileOpen(false)}>{t("nav_newsletter")}</a>
-        </div>
-        <div className="nav-right">
-          <div className="lang-switcher" role="group" aria-label="Language">
-            {LANGS.map((l) => (
-              <button key={l} className={`lang-btn ${lang === l ? "active" : ""}`} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>
-            ))}
-          </div>
-        </div>
-        <button className={`hamburger ${mobileOpen ? "open" : ""}`} aria-label="Menu" onClick={() => setMobileOpen((v) => !v)}>
-          <span></span><span></span><span></span>
-        </button>
-      </nav>
-
-      {/* Mobile-Menü */}
-      <div className={`mobile-nav ${mobileOpen ? "open" : ""}`} id="mobile-nav">
-        <a href="#categories" onClick={() => setMobileOpen(false)}>{t("nav_topics")}</a>
-        <a href="#blog" onClick={() => setMobileOpen(false)}>{t("nav_blog")}</a>
-        <a href="#ai" onClick={() => setMobileOpen(false)}>{t("nav_ai")}</a>
-        <a href="#newsletter" onClick={() => setMobileOpen(false)}>{t("nav_newsletter")}</a>
-        <div className="lang-switcher">
-          {LANGS.map((l) => (
-            <button key={l} className={`lang-btn ${lang === l ? "active" : ""}`} onClick={() => changeLang(l)}>{l.toUpperCase()}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── HERO ────────────────────────────────────────── */}
-      <section className="hero" id="home">
-        <div className="hero-bg"></div>
-        <div className="orb orb-1"></div><div className="orb orb-2"></div><div className="orb orb-3"></div>
-        <div className="hero-content">
-          <div className="hero-badge">{t("hero_badge")}</div>
-          <h1>
-            <span>{t("hero_h1_l1")}</span><br />
-            <em>{t("hero_h1_l2")}</em><br />
-            <span className="acc">{t("hero_h1_l3")}</span>
-          </h1>
-          <p className="hero-sub">{t("hero_sub")}</p>
-          <div className="hero-actions">
-            <a href="#blog" className="btn-primary"><span>{t("hero_cta")}</span> <span className="arr">→</span></a>
-            <a href="#categories" className="btn-ghost"><span>{t("hero_ghost")}</span> ↓</a>
-          </div>
-          <div className="hero-stats">
-            <div><div className="stat-num">{t("stat1_n")}</div><div className="stat-label">{t("stat1_l")}</div></div>
-            <div><div className="stat-num">{t("stat2_n")}</div><div className="stat-label">{t("stat2_l")}</div></div>
-            <div><div className="stat-num">{t("stat3_n")}</div><div className="stat-label">{t("stat3_l")}</div></div>
-          </div>
-        </div>
-        <div className="hero-visual" aria-hidden="true">
-          <div className="orbit-ring">
-            <div className="orbit-card oc-top"><div className="oc-emoji">🧘</div><div className="oc-label">Mindful</div></div>
-            <div className="orbit-card oc-right"><div className="oc-emoji">🌍</div><div className="oc-label">Worldwide</div></div>
-            <div className="orbit-card oc-bottom"><div className="oc-emoji">🤖</div><div className="oc-label">Future-Self</div></div>
-            <div className="orbit-card oc-left"><div className="oc-emoji">💪</div><div className="oc-label">Resilient</div></div>
-            <div className="orbit-inner"><Logo /></div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── KATEGORIEN ──────────────────────────────────── */}
-      <section className="categories" id="categories">
-        <div className="section-head reveal">
-          <span className="section-tag">{t("section_topics")}</span>
-          <h2>{t("topics_h")}</h2>
-          <p>{t("topics_p")}</p>
-        </div>
-        <div className="cat-grid reveal">
-          {cats.map((c) => (
-            <div key={c.id} className="cat-card" data-c={c.c} onClick={() => filterTo(c.id)} style={{ cursor: "pointer" }}>
-              <div className="cat-icon">{c.icon}</div>
-              <div className="cat-name">{t(c.n)}</div>
-              <div className="cat-desc">{t(c.d)}</div>
-              <span className="cat-link">{t(c.l)}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── FEATURED ────────────────────────────────────── */}
-      <section className="featured-section" id="featured">
-        <div className="featured-inner">
-          <div className="featured-left reveal">
-            <div className="featured-label">{t("feat_label")}</div>
-            <h2 style={{ cursor: "pointer" }} onClick={() => openPost(featuredPost)}>{t("feat_h")}</h2>
-            <div className="featured-meta">
-              <div className="author-chip"><div className="av" style={{ background: "var(--teal)" }}>BJ</div><span>BeJoy Redaktion</span></div>
-              <span className="dot"></span><span>{t("feat_read")}</span>
-            </div>
-            <div className="featured-body">
-              <p>{t("feat_p1")}</p>
-              <blockquote>{t("feat_quote")}</blockquote>
-              <p>{t("feat_p2")}</p>
-              <p>{t("feat_p3")}</p>
-            </div>
-            <div className="featured-tags">
-              <span className="featured-tag">{t("feat_tag1")}</span>
-              <span className="featured-tag">{t("feat_tag2")}</span>
-              <span className="featured-tag">{t("feat_tag3")}</span>
-              <span className="featured-tag">{t("feat_tag4")}</span>
-            </div>
-            <div style={{ marginTop: 22 }}>
-              <button className="btn-primary" onClick={() => openPost(featuredPost)}><span>{t("read_more")}</span> <span className="arr">→</span></button>
-            </div>
-          </div>
-          <div className="featured-sidebar reveal">
-            <div className="sidebar-card">
-              <div className="progress-bar"><div className="progress-fill" style={{ width: progress + "%" }}></div></div>
-              <p className="read-time">{t("sidebar_prog")}</p>
-            </div>
-            <div className="sidebar-card">
-              <h4>{t("sidebar_also")}</h4>
-              <ul className="sidebar-list">
-                {sidebarPosts.map((s) => (
-                  <li key={s.id}><button onClick={() => openPostById(s.id)}>{s[lang] || s.de}</button></li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── BLOG ────────────────────────────────────────── */}
-      <section className="blog" id="blog">
-        <div className="section-head reveal">
-          <span className="section-tag">{t("section_blog")}</span>
-          <h2>{t("blog_h")}</h2>
-          <p>{t("blog_p")}</p>
-        </div>
-        <div className="blog-controls reveal">
-          <div className="filter-tabs">
-            {filterTabs.map(([cat, key]) => (
-              <button key={cat} className={`filter-tab ${filterCat === cat ? "active" : ""}`} onClick={() => setFilterCat(cat)}>{t(key)}</button>
-            ))}
-          </div>
-        </div>
-        <div className="blog-grid">
-          {visiblePosts.map((p) => {
-            const d = p[lang] || p.de;
-            return (
-              <article key={p.id} className={`blog-card ${p.wide ? "wide" : ""}`} onClick={() => openPost(p)}>
-                <div className="card-thumb">
-                  <div className="thumb-bg" style={{ background: p.bg }}>{p.emoji}</div>
-                  <div className="card-badge" style={{ color: p.badgeColor }}>{catLabel(p.cat)}</div>
-                </div>
-                <div className="card-body">
-                  <div className="card-meta"><span>{p.date}</span><span className="dot"></span><span>{p.read}</span></div>
-                  <h3>{d.title}</h3>
-                  <p>{d.excerpt}</p>
-                </div>
-                <div className="card-footer">
-                  <div className="author-chip"><div className="av" style={{ background: p.av }}>{p.author}</div><span>{p.authorName}</span></div>
-                  <span className="read-link">{t("read_more")} →</span>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── KI / FUTURE-SELF ────────────────────────────── */}
-      <section className="ai-world" id="ai">
-        <div className="ai-world-bg"></div>
-        <div className="ai-inner">
-          <div className="ai-left reveal">
-            <span className="section-tag">{t("section_ai")}</span>
-            <h2 dangerouslySetInnerHTML={{ __html: t("ai_h").replace("KI-Welt", "<em>" + (t("ai_em") || "KI-Welt") + "</em>") }} />
-            <p>{t("ai_p")}</p>
-            <button className="btn-primary" style={{ background: "var(--joy)", color: "var(--earth)" }} onClick={() => filterTo("future")}>
-              <span>{t("ai_cta")}</span> <span className="arr">→</span>
-            </button>
-          </div>
-          <div className="ai-grid reveal">
-            {aiCards.map((c) => (
-              <div key={c.id} className="ai-card" style={{ cursor: "pointer" }} onClick={() => openPostById(c.id)}>
-                <span className="emoji">{c.emoji}</span><h4>{t(c.h)}</h4><p>{t(c.p)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── WORLD WISDOM ────────────────────────────────── */}
-      <section className="wisdom" id="wisdom">
-        <div className="section-head reveal">
-          <span className="section-tag">{t("section_wisdom")}</span>
-          <h2>{t("wisdom_h")}</h2>
-          <p>{t("wisdom_p")}</p>
-        </div>
-        <div className="wisdom-grid reveal">
-          {wisdom.map((w, i) => (
-            <div key={i} className="wisdom-card" style={{ cursor: "pointer" }}
-              onClick={() => (w.id ? openPostById(w.id) : filterTo("worldwide"))}>
-              <div className="wisdom-bg"></div>
-              <div className="wisdom-big-emoji">{w.emoji}</div>
-              <div className="wisdom-origin">{w.origin}</div>
-              <div className="wisdom-word">{w.word}</div>
-              <div className="wisdom-meaning">{w.meaning}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── NEWSLETTER ──────────────────────────────────── */}
-      <section className="newsletter" id="newsletter">
-        <div className="nl-inner reveal">
-          <span className="section-tag">{t("section_nl")}</span>
-          <h2>{t("nl_h")}</h2>
-          <p>{t("nl_p")}</p>
-          <div className="nl-form">
-            <input type="email" id="nl-input" placeholder={t("nl_placeholder")} autoComplete="email" />
-            <button type="button" onClick={submitNl}>{t("nl_btn")}</button>
-          </div>
-          {nlState.msg
-            ? <p className="nl-note" style={{ color: nlState.ok ? "var(--teal)" : "var(--rose)", fontWeight: 600 }}>{nlState.msg}</p>
-            : <p className="nl-note">{t("nl_note")}</p>}
-        </div>
-      </section>
-
-      {/* ── ÜBER UNS ────────────────────────────────────── */}
-      <section className="about-section" id="about" style={{ padding: "88px 24px", background: "var(--cream,#FAF7F2)" }}>
-        <div className="about-inner reveal" style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
-          <span className="section-tag" style={{ color: "var(--teal,#1A7A6E)" }}>{t("section_about")}</span>
-          <h2 style={{ fontFamily: "Georgia,'Playfair Display',serif", fontSize: "clamp(26px,4vw,38px)", margin: "14px 0 22px", color: "var(--earth,#2C1810)" }}>{t("about_h")}</h2>
-          <p style={{ fontSize: 18, lineHeight: 1.7, color: "var(--gray,#6B6560)", margin: "0 auto 36px", maxWidth: 620 }}>{t("about_p")}</p>
-          <a href="https://www.cleebration.com" target="_blank" rel="noopener noreferrer" style={{ display: "inline-block" }} aria-label="cleebration — zur Website">
-            <img src="/cleebration-logo.jpg" alt="cleebration Logo" style={{ maxWidth: 280, width: "100%", height: "auto" }} loading="lazy" />
-          </a>
-          <p style={{ marginTop: 14, fontSize: 14, color: "var(--gray,#6B6560)" }}>
-            <a href="https://www.cleebration.com" target="_blank" rel="noopener noreferrer" style={{ color: "var(--teal,#1A7A6E)", textDecoration: "none" }}>www.cleebration.com →</a>
-          </p>
-        </div>
-      </section>
-
-      {/* ── FOOTER ──────────────────────────────────────── */}
-      <footer>
-        <div className="footer-langbar">
-          <span className="footer-langbar-label">{lang === "de" ? "Sprache" : lang === "es" ? "Idioma" : "Language"}</span>
-          <div className="footer-lang">
-            {LANGS.map((l) => (
-              <button key={l} className={lang === l ? "active" : ""} onClick={() => changeLang(l)}>
-                {l === "de" ? "Deutsch" : l === "en" ? "English" : "Español"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="footer-top">
-          <div className="footer-brand">
-            <button className="logo-wrap" onClick={goHome} style={{ background: "none", border: "none", cursor: "pointer" }}>
-              <Logo /><span className="logo-text">Be<span>Joy</span></span>
-            </button>
-            <p>{t("footer_tagline")}</p>
-            <div className="social-row">
-              <a className="social-btn" href="https://www.instagram.com/bejoylife/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
-              </a>
-              <a className="social-btn" href="https://www.facebook.com/beJoyLife" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
-                <svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
-              </a>
-              <a className="social-btn" href="https://twitter.com/BeJoyLife" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">
-                <svg viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z" /></svg>
-              </a>
-              <a className="social-btn" href="https://youtube.com/@beJoyLife" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
-                <svg viewBox="0 0 24 24"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z" /><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" /></svg>
-              </a>
-            </div>
-          </div>
-          <div className="footer-col">
-            <h5>{t("footer_h_topics")}</h5>
-            <ul>
-              {cats.map((c) => (
-                <li key={c.id}><button onClick={() => filterTo(c.id)}>{t(c.n)}</button></li>
-              ))}
-            </ul>
-          </div>
-          <div className="footer-col">
-            <h5>{t("footer_h_bejoy")}</h5>
-            <ul>
-              <li><a href="#about" onClick={() => setMobileOpen(false)}>{t("footer_about")}</a></li>
-              <li><a href="#blog" onClick={() => setMobileOpen(false)}>{t("footer_blog")}</a></li>
-              <li><a href="#newsletter" onClick={() => setMobileOpen(false)}>{t("footer_nl")}</a></li>
-            </ul>
-          </div>
-          <div className="footer-col">
-            <h5>{t("footer_h_legal")}</h5>
-            <ul>
-              <li><button onClick={() => openLegal("impressum")}>{t("footer_imprint")}</button></li>
-              <li><button onClick={() => openLegal("datenschutz")}>{t("footer_privacy")}</button></li>
-              <li><button onClick={() => { try { localStorage.removeItem("bejoy_cookie"); } catch (e) {} setCookie(null); }}>{t("footer_cookies")}</button></li>
-            </ul>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <p>{t("footer_copy")}</p>
-        </div>
-      </footer>
-
-      {/* ── COOKIE-BANNER ───────────────────────────────── */}
-      {cookie !== "accepted" && cookie !== "declined" && (
-        <div id="cookie-banner" role="dialog" aria-label="Cookie consent">
-          <p>{t("cookie_text")}</p>
-          <div className="cookie-btns">
-            <button className="cookie-accept" onClick={() => { try { localStorage.setItem("bejoy_cookie", "accepted"); } catch (e) {} setCookie("accepted"); }}>{t("cookie_accept")}</button>
-            <button className="cookie-decline" onClick={() => { try { localStorage.setItem("bejoy_cookie", "declined"); } catch (e) {} setCookie("declined"); }}>{t("cookie_decline")}</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── SCROLL-TOP ──────────────────────────────────── */}
-      <button id="scroll-top" className={showTop ? "visible" : ""} aria-label="Scroll to top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>↑</button>
-
-      {/* ── READER (Artikel) ────────────────────────────── */}
-      {activePost && (() => {
-        const d = activePost[lang] || activePost.de;
-        return (
-          <div className="reader" role="dialog" aria-modal="true">
-            <div className="reader-backdrop" onClick={() => setActivePost(null)}></div>
-            <article className="reader-panel">
-              <button className="reader-close" aria-label="Close" onClick={() => setActivePost(null)}>✕</button>
-              <div className="reader-hero">
-                <div className="reader-emoji">{activePost.emoji}</div>
-                <span className="reader-badge" style={{ color: activePost.badgeColor }}>{catLabel(activePost.cat)}</span>
-                <h1 className="reader-title">{d.title}</h1>
-                <div className="reader-meta">
-                  <span>{activePost.authorName}</span><span className="dot"></span>
-                  <span>{activePost.date}</span><span className="dot"></span><span>{activePost.read}</span>
-                </div>
-              </div>
-              <div className="reader-body" dangerouslySetInnerHTML={{ __html: d.content || `<p>${d.excerpt}</p>` }} />
-            </article>
-          </div>
-        );
-      })()}
-    </>
-  );
+  --nav-h:      80px;
 }
+
+/* ═══════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--earth);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+img { display: block; max-width: 100%; }
+a { text-decoration: none; color: inherit; }
+button { font-family: inherit; cursor: pointer; border: none; }
+ul { list-style: none; }
+
+/* ═══════════════════════════════════════════
+   CUSTOM CURSOR
+═══════════════════════════════════════════ */
+/* Custom-Cursor entfernt — der native Mauszeiger bleibt immer sichtbar. */
+
+/* ═══════════════════════════════════════════
+   LANGUAGE SWITCHER
+═══════════════════════════════════════════ */
+.lang-switcher {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--light);
+  border-radius: var(--radius-xl);
+  padding: 5px;
+}
+.lang-btn {
+  background: none;
+  font-size: 15px; font-weight: 600;
+  color: var(--gray);
+  padding: 7px 15px; border-radius: 100px;
+  transition: all .2s; cursor: pointer; border: none;
+  letter-spacing: .3px;
+}
+.lang-btn.active {
+  background: var(--joy);
+  color: var(--earth);
+}
+.lang-btn:hover:not(.active) { color: var(--earth); }
+
+/* ═══════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════ */
+nav {
+  position: fixed; top: 0; width: 100%; z-index: 200;
+  height: var(--nav-h);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 52px;
+  background: rgba(250,247,242,.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(44,24,16,.06);
+  transition: box-shadow .3s;
+}
+nav.scrolled { box-shadow: 0 4px 30px rgba(44,24,16,.08); }
+
+.logo-wrap { display: flex; align-items: center; gap: 10px; }
+.logo-svg  { width: 40px; height: 40px; flex-shrink: 0; }
+.logo-text {
+  font-family: 'Playfair Display', serif;
+  font-size: 24px; font-weight: 700;
+  color: var(--earth); letter-spacing: -.4px;
+}
+.logo-text span { color: var(--joy); }
+
+.nav-links {
+  display: flex; align-items: center; gap: 38px;
+}
+.nav-links a {
+  font-size: 17px; font-weight: 600; color: var(--earth);
+  position: relative; transition: color .2s;
+  padding-bottom: 3px;
+}
+.nav-links a::after {
+  content: ''; position: absolute; bottom: -2px; left: 0;
+  width: 0; height: 2px; background: var(--joy);
+  transition: width .3s ease;
+}
+.nav-links a:hover { color: var(--teal); }
+.nav-links a:hover::after { width: 100%; }
+
+.nav-right { display: flex; align-items: center; gap: 16px; }
+
+.nav-cta {
+  display: inline-flex; align-items: center;
+  background: var(--joy); color: var(--earth);
+  font-size: 15px; font-weight: 600;
+  padding: 11px 24px; border-radius: var(--radius-xl);
+  transition: background .2s, transform .2s;
+  letter-spacing: .2px;
+}
+.nav-cta:hover { background: var(--joy-dark); transform: translateY(-1px); }
+
+/* Mobile menu */
+.hamburger {
+  display: none; flex-direction: column; gap: 5px;
+  padding: 6px; cursor: pointer; background: none; border: none;
+}
+.hamburger span {
+  display: block; width: 22px; height: 2px;
+  background: var(--earth); border-radius: 2px;
+  transition: all .3s;
+}
+.hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+.mobile-nav {
+  display: none; position: fixed;
+  top: var(--nav-h); left: 0; right: 0;
+  background: var(--cream); z-index: 190;
+  padding: 24px 28px 32px;
+  border-bottom: 1px solid rgba(44,24,16,.08);
+  flex-direction: column; gap: 8px;
+  box-shadow: var(--shadow-md);
+}
+.mobile-nav.open { display: flex; }
+.mobile-nav a {
+  font-size: 16px; font-weight: 500; color: var(--earth);
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(44,24,16,.06);
+}
+.mobile-nav .lang-switcher { margin-top: 12px; align-self: flex-start; }
+
+/* ═══════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════ */
+.hero {
+  min-height: 100vh;
+  display: grid; grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: calc(var(--nav-h) + 64px) 52px 80px;
+  position: relative; overflow: hidden;
+  gap: 48px;
+}
+.hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 55% 70% at 80% 50%, rgba(26,122,110,.09) 0%, transparent 70%),
+    radial-gradient(ellipse 45% 45% at 15% 80%, rgba(245,166,35,.13) 0%, transparent 60%),
+    radial-gradient(ellipse 30% 30% at 60% 10%, rgba(232,133,106,.07) 0%, transparent 60%);
+}
+.orb {
+  position: absolute; border-radius: 50%;
+  pointer-events: none; animation: floatOrb linear infinite;
+}
+.orb-1 { width: 320px; height: 320px; background: radial-gradient(circle, rgba(245,166,35,.14), transparent 70%); top: 8%; right: 4%; animation-duration: 20s; }
+.orb-2 { width: 200px; height: 200px; background: radial-gradient(circle, rgba(26,122,110,.11), transparent 70%); bottom: 15%; right: 28%; animation-duration: 25s; animation-delay: -9s; }
+.orb-3 { width: 140px; height: 140px; background: radial-gradient(circle, rgba(232,133,106,.16), transparent 70%); top: 45%; left: 3%; animation-duration: 17s; animation-delay: -5s; }
+
+@keyframes floatOrb {
+  0%,100% { transform: translateY(0) scale(1); }
+  33%      { transform: translateY(-22px) scale(1.04); }
+  66%      { transform: translateY(11px) scale(.97); }
+}
+
+.hero-content { position: relative; z-index: 1; }
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--rose-pale); color: var(--rose);
+  font-size: 11px; font-weight: 600;
+  padding: 7px 16px; border-radius: var(--radius-xl);
+  letter-spacing: 1px; text-transform: uppercase;
+  margin-bottom: 32px;
+  animation: fadeUp .7s ease both;
+}
+.hero-badge::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--rose); animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .4; transform: scale(.6); }
+}
+
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(40px, 5vw, 70px);
+  line-height: 1.08; letter-spacing: -1.5px;
+  margin-bottom: 28px;
+  animation: fadeUp .7s ease .12s both;
+}
+.hero h1 em   { font-style: italic; color: var(--teal); }
+.hero h1 .acc { color: var(--joy); }
+
+.hero-sub {
+  font-size: 18px; line-height: 1.75; color: var(--gray);
+  font-weight: 300; max-width: 460px;
+  margin-bottom: 44px;
+  animation: fadeUp .7s ease .24s both;
+}
+
+.hero-actions {
+  display: flex; align-items: center; gap: 20px;
+  animation: fadeUp .7s ease .36s both;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--earth); color: var(--cream);
+  font-size: 15px; font-weight: 500;
+  padding: 15px 32px; border-radius: var(--radius-xl);
+  transition: background .25s, transform .2s;
+}
+.btn-primary:hover { background: var(--teal); transform: translateY(-2px); }
+.btn-primary .arr { transition: transform .2s; display: inline-block; }
+.btn-primary:hover .arr { transform: translateX(4px); }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 15px; font-weight: 500; color: var(--earth);
+  transition: gap .2s;
+}
+.btn-ghost:hover { gap: 10px; }
+
+.hero-stats {
+  display: flex; gap: 44px; margin-top: 56px;
+  padding-top: 40px; border-top: 1px solid rgba(44,24,16,.1);
+  animation: fadeUp .7s ease .48s both;
+  flex-wrap: wrap;
+}
+.stat-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 34px; font-weight: 700; line-height: 1;
+}
+.stat-num span { color: var(--joy); }
+.stat-label { font-size: 12px; color: var(--gray); margin-top: 5px; letter-spacing: .3px; }
+
+/* Hero Visual */
+.hero-visual {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeUp .7s ease .18s both;
+}
+.orbit-ring {
+  width: 460px; height: 460px; border-radius: 50%;
+  border: 1.5px dashed rgba(26,122,110,.18);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  animation: spin 44s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.orbit-inner {
+  width: 340px; height: 340px; border-radius: 50%;
+  background: linear-gradient(145deg, rgba(232,245,243,.7), rgba(253,240,235,.5));
+  border: 1px solid rgba(26,122,110,.09);
+  display: flex; align-items: center; justify-content: center;
+  animation: spin 44s linear infinite reverse;
+  position: relative; overflow: hidden;
+}
+.orbit-center {
+  animation: spin 44s linear infinite;
+  display: flex; align-items: center; justify-content: center;
+}
+.orbit-card {
+  position: absolute;
+  background: white; border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: var(--shadow-md);
+  animation: spin 44s linear infinite reverse;
+  text-align: center;
+  min-width: 90px;
+}
+.orbit-card .oc-emoji { font-size: 20px; margin-bottom: 3px; }
+.orbit-card .oc-label { font-size: 12px; font-weight: 500; color: var(--earth); }
+.oc-top    { top: -18px; left: 50%; transform: translateX(-50%); }
+.oc-right  { right: -28px; top: 50%; transform: translateY(-50%); }
+.oc-bottom { bottom: -18px; left: 50%; transform: translateX(-50%); }
+.oc-left   { left: -28px; top: 50%; transform: translateY(-50%); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════
+   TICKER
+═══════════════════════════════════════════ */
+.ticker {
+  background: var(--earth); padding: 20px 0;
+  overflow: hidden; position: relative;
+}
+.ticker::before, .ticker::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 1;
+}
+.ticker::before { left: 0; background: linear-gradient(to right, var(--earth), transparent); }
+.ticker::after  { right: 0; background: linear-gradient(to left, var(--earth), transparent); }
+.ticker-track {
+  display: flex; gap: 0;
+  animation: tickerMove 22s linear infinite;
+  width: max-content;
+}
+@keyframes tickerMove { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+.ticker-item {
+  display: flex; align-items: center; gap: 10px;
+  color: rgba(250,247,242,.55);
+  font-size: 12px; font-weight: 500;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  white-space: nowrap; padding: 0 28px;
+}
+.ticker-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--joy); flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════
+   SECTION UTILITIES
+═══════════════════════════════════════════ */
+.section-tag {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--teal); margin-bottom: 14px;
+}
+.section-head {
+  text-align: center; margin-bottom: 64px;
+}
+.section-head h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(30px, 4vw, 50px);
+  line-height: 1.15; letter-spacing: -1px;
+}
+.section-head p {
+  color: var(--gray); font-size: 17px; line-height: 1.75;
+  max-width: 500px; margin: 14px auto 0; font-weight: 300;
+}
+
+/* Reveal animation */
+.reveal {
+  opacity: 0; transform: translateY(36px);
+  transition: opacity .8s ease, transform .8s ease;
+}
+.reveal.visible { opacity: 1; transform: none; }
+
+/* ═══════════════════════════════════════════
+   CATEGORIES
+═══════════════════════════════════════════ */
+.categories { padding: 96px 52px; background: var(--cream); }
+
+.cat-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;
+}
+.cat-card {
+  background: white; border-radius: var(--radius-lg);
+  padding: 32px 22px; text-align: center;
+  border: 1.5px solid transparent;
+  transition: all .3s ease; cursor: pointer;
+  position: relative; overflow: hidden;
+}
+.cat-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--c-pale); opacity: 0; transition: opacity .3s;
+}
+.cat-card:hover { transform: translateY(-7px); border-color: var(--c-main); box-shadow: var(--shadow-lg); }
+.cat-card:hover::before { opacity: 1; }
+
+.cat-card[data-c="teal"] { --c-main: var(--teal); --c-pale: rgba(26,122,110,.05); --c-icon: rgba(26,122,110,.12); }
+.cat-card[data-c="joy"]  { --c-main: var(--joy);  --c-pale: rgba(245,166,35,.06); --c-icon: rgba(245,166,35,.14); }
+.cat-card[data-c="rose"] { --c-main: var(--rose);  --c-pale: rgba(232,133,106,.05); --c-icon: rgba(232,133,106,.12); }
+.cat-card[data-c="earth"]{ --c-main: var(--earth); --c-pale: rgba(44,24,16,.04);  --c-icon: rgba(44,24,16,.08); }
+.cat-card[data-c="warm"] { --c-main: #8B7355;       --c-pale: rgba(139,115,85,.05); --c-icon: rgba(139,115,85,.1); }
+
+.cat-icon {
+  width: 54px; height: 54px; border-radius: 14px;
+  background: var(--c-icon);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; margin: 0 auto 18px;
+  position: relative; z-index: 1;
+  transition: transform .3s;
+}
+.cat-card:hover .cat-icon { transform: scale(1.1) rotate(-3deg); }
+.cat-name { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; margin-bottom: 8px; position: relative; z-index: 1; }
+.cat-desc { font-size: 13px; color: var(--gray); line-height: 1.55; position: relative; z-index: 1; }
+.cat-link { font-size: 12px; font-weight: 500; color: var(--c-main); margin-top: 14px; display: block; position: relative; z-index: 1; }
+
+/* ═══════════════════════════════════════════
+   FEATURED ARTICLE (full read)
+═══════════════════════════════════════════ */
+.featured-section {
+  padding: 96px 52px;
+  background: var(--teal-pale);
+  position: relative; overflow: hidden;
+}
+.featured-section::before {
+  content: ''; position: absolute;
+  top: -80px; right: -80px;
+  width: 400px; height: 400px; border-radius: 50%;
+  background: rgba(245,166,35,.07);
+  pointer-events: none;
+}
+.featured-inner {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: start;
+}
+.featured-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--teal);
+  margin-bottom: 20px;
+}
+.featured-label::before {
+  content: ''; width: 28px; height: 1.5px; background: var(--teal);
+}
+.featured-inner h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.2; letter-spacing: -.8px;
+  margin-bottom: 20px;
+}
+.featured-meta {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px; color: var(--gray);
+  margin-bottom: 28px;
+}
+.featured-meta .dot { width: 3px; height: 3px; background: var(--gray); border-radius: 50%; }
+.featured-body p {
+  font-size: 16px; line-height: 1.85; color: #4a4540;
+  margin-bottom: 20px; font-weight: 300;
+}
+.featured-body p:first-of-type::first-letter {
+  font-family: 'Playfair Display', serif;
+  font-size: 64px; font-weight: 700; color: var(--teal);
+  float: left; line-height: 0.8; margin: 8px 12px 0 0;
+}
+.featured-body blockquote {
+  border-left: 3px solid var(--joy);
+  padding: 16px 0 16px 24px;
+  margin: 28px 0;
+  font-family: 'Playfair Display', serif;
+  font-size: 20px; font-style: italic;
+  color: var(--earth); line-height: 1.5;
+}
+.featured-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
+.featured-tag {
+  background: white; font-size: 12px; font-weight: 500;
+  padding: 6px 14px; border-radius: 100px; color: var(--gray);
+  border: 1px solid rgba(44,24,16,.1);
+}
+
+.featured-sidebar { position: sticky; top: calc(var(--nav-h) + 32px); }
+.sidebar-card {
+  background: white; border-radius: var(--radius-lg);
+  padding: 28px; margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.sidebar-card h4 {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px; margin-bottom: 16px; color: var(--earth);
+}
+.sidebar-list li {
+  padding: 10px 0; border-bottom: 1px solid var(--light);
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; color: var(--earth); cursor: pointer;
+  transition: color .2s;
+}
+.sidebar-list li:last-child { border: none; }
+.sidebar-list li:hover { color: var(--teal); }
+.sidebar-list li .num {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px; font-weight: 700; color: var(--joy);
+  min-width: 28px;
+}
+.progress-bar {
+  height: 3px; background: var(--light); border-radius: 2px; margin-bottom: 10px;
+}
+.progress-fill {
+  height: 100%; border-radius: 2px; background: var(--teal);
+  width: 0; transition: width .3s;
+}
+.sidebar-card .read-time { font-size: 12px; color: var(--gray); }
+
+/* ═══════════════════════════════════════════
+   BLOG GRID
+═══════════════════════════════════════════ */
+.blog { padding: 96px 52px; background: var(--light); }
+
+.blog-controls {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 40px; flex-wrap: wrap; gap: 16px;
+}
+.filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-tab {
+  background: white; color: var(--gray);
+  font-size: 13px; font-weight: 500;
+  padding: 8px 18px; border-radius: 100px;
+  cursor: pointer; border: 1.5px solid transparent;
+  transition: all .2s;
+}
+.filter-tab:hover, .filter-tab.active {
+  background: var(--earth); color: var(--cream);
+}
+
+.blog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); gap: 20px;
+}
+.blog-card {
+  background: white; border-radius: var(--radius-lg);
+  overflow: hidden; cursor: pointer;
+  transition: all .3s ease;
+  display: flex; flex-direction: column;
+}
+.blog-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); }
+.blog-card.wide { grid-column: 1 / -1; flex-direction: row; }
+
+.card-thumb {
+  height: 200px; position: relative; overflow: hidden; flex-shrink: 0;
+}
+.blog-card.wide .card-thumb { width: 420px; height: auto; }
+.thumb-bg {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 72px; transition: transform .5s ease;
+}
+.blog-card:hover .thumb-bg { transform: scale(1.08); }
+.card-badge {
+  position: absolute; top: 14px; left: 14px;
+  background: white; font-size: 11px; font-weight: 600;
+  padding: 5px 12px; border-radius: 100px;
+  letter-spacing: .3px;
+}
+
+.card-body { padding: 24px; flex: 1; display: flex; flex-direction: column; }
+.card-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--gray); margin-bottom: 12px; }
+.card-meta .dot { width: 3px; height: 3px; background: var(--gray); border-radius: 50%; }
+.card-body h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 19px; line-height: 1.3; margin-bottom: 12px;
+  transition: color .2s;
+}
+.blog-card.wide .card-body h3 { font-size: 26px; }
+.blog-card:hover h3 { color: var(--teal); }
+.card-body p { font-size: 14px; color: var(--gray); line-height: 1.65; font-weight: 300; flex: 1; }
+
+.card-footer {
+  padding: 16px 24px 22px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.author-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.av {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: white; flex-shrink: 0;
+}
+.read-link {
+  font-size: 13px; font-weight: 500; color: var(--teal);
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: gap .2s;
+}
+.read-link:hover { gap: 8px; }
+
+/* ═══════════════════════════════════════════
+   AI SECTION
+═══════════════════════════════════════════ */
+.ai-world {
+  padding: 96px 52px; background: var(--earth);
+  position: relative; overflow: hidden;
+}
+.ai-world-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 50% 80% at 95% 50%, rgba(245,166,35,.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 5% 20%,  rgba(26,122,110,.09) 0%, transparent 50%);
+}
+.ai-inner {
+  position: relative; z-index: 1;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+}
+.ai-left .section-tag { color: var(--joy); }
+.ai-left h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(30px, 3.5vw, 46px);
+  color: var(--cream); line-height: 1.15; letter-spacing: -1px;
+  margin-bottom: 20px;
+}
+.ai-left h2 em { color: var(--joy); font-style: italic; }
+.ai-left p { color: rgba(250,247,242,.6); font-size: 17px; line-height: 1.75; font-weight: 300; margin-bottom: 32px; }
+
+.ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ai-card {
+  background: rgba(250,247,242,.05);
+  border: 1px solid rgba(250,247,242,.09);
+  border-radius: var(--radius-md); padding: 24px;
+  transition: all .3s ease;
+}
+.ai-card:hover { background: rgba(250,247,242,.09); transform: translateY(-3px); }
+.ai-card .emoji { font-size: 28px; margin-bottom: 12px; display: block; }
+.ai-card h4 { color: var(--cream); font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+.ai-card p  { color: rgba(250,247,242,.45); font-size: 13px; line-height: 1.55; }
+
+/* ═══════════════════════════════════════════
+   WORLD WISDOM
+═══════════════════════════════════════════ */
+.wisdom { padding: 96px 52px; background: var(--cream); }
+.wisdom-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+}
+.wisdom-card {
+  border-radius: var(--radius-lg); padding: 36px 28px;
+  position: relative; overflow: hidden; cursor: pointer;
+  transition: transform .3s, box-shadow .3s;
+  min-height: 260px; display: flex; flex-direction: column; justify-content: flex-end;
+}
+.wisdom-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
+.wisdom-bg { position: absolute; inset: 0; z-index: 0; }
+.wisdom-card:nth-child(1) .wisdom-bg { background: linear-gradient(145deg, #2C5F8A, #1A3A5C); }
+.wisdom-card:nth-child(2) .wisdom-bg { background: linear-gradient(145deg, #7A4A1A, #5C3010); }
+.wisdom-card:nth-child(3) .wisdom-bg { background: linear-gradient(145deg, #1A6B3C, #0F4228); }
+.wisdom-card:nth-child(4) .wisdom-bg { background: linear-gradient(145deg, #6B1A4A, #4A0F32); }
+.wisdom-big-emoji { position: absolute; top: 20px; right: 20px; font-size: 64px; opacity: .2; z-index: 1; }
+.wisdom-origin {
+  position: relative; z-index: 1;
+  font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+  color: rgba(255,255,255,.5); margin-bottom: 8px;
+}
+.wisdom-word {
+  position: relative; z-index: 1;
+  font-family: 'Playfair Display', serif;
+  font-size: 28px; font-weight: 700; color: white; margin-bottom: 8px;
+}
+.wisdom-meaning { position: relative; z-index: 1; font-size: 14px; color: rgba(255,255,255,.7); line-height: 1.5; }
+
+/* ═══════════════════════════════════════════
+   NEWSLETTER
+═══════════════════════════════════════════ */
+.newsletter {
+  padding: 96px 52px;
+  text-align: center; background: var(--light);
+}
+.nl-inner { max-width: 580px; margin: 0 auto; }
+.nl-inner h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(32px, 4vw, 48px); letter-spacing: -1px; margin-bottom: 16px;
+}
+.nl-inner p { color: var(--gray); font-size: 17px; line-height: 1.7; margin-bottom: 36px; font-weight: 300; }
+.nl-form {
+  display: flex; gap: 10px;
+  background: white; padding: 6px 6px 6px 22px;
+  border-radius: 100px; border: 1.5px solid rgba(44,24,16,.12);
+  transition: border-color .2s;
+}
+.nl-form:focus-within { border-color: var(--teal); }
+.nl-form input {
+  flex: 1; border: none; outline: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px; color: var(--earth); background: transparent;
+  min-width: 0;
+}
+.nl-form input::placeholder { color: var(--gray); }
+.nl-form button {
+  background: var(--teal); color: white;
+  padding: 13px 26px; border-radius: 100px;
+  font-size: 14px; font-weight: 500;
+  transition: background .2s, transform .15s;
+  white-space: nowrap;
+}
+.nl-form button:hover { background: var(--teal-light); transform: scale(1.02); }
+.nl-note { font-size: 12px; color: var(--gray); margin-top: 16px; }
+
+/* ═══════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════ */
+footer {
+  background: var(--earth); padding: 72px 52px 36px;
+}
+.footer-top {
+  display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr;
+  gap: 52px; margin-bottom: 56px;
+}
+.footer-brand .logo-text { color: var(--cream); }
+.footer-brand p {
+  color: rgba(250,247,242,.5); font-size: 16px; line-height: 1.75;
+  margin-top: 18px; font-weight: 300; max-width: 280px;
+}
+.footer-brand .social-row { display: flex; gap: 10px; margin-top: 24px; }
+.social-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(250,247,242,.08);
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(250,247,242,.85);
+  transition: background .2s, transform .2s, color .2s; cursor: pointer;
+}
+.social-btn svg {
+  width: 18px; height: 18px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.social-btn:hover { background: var(--joy); color: var(--earth); transform: translateY(-2px); }
+
+.footer-col h5 {
+  font-size: 14px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: rgba(250,247,242,.45); margin-bottom: 22px;
+}
+.footer-col li { margin-bottom: 13px; }
+.footer-col a,
+.footer-col button {
+  font-size: 17px; color: rgba(250,247,242,.72);
+  transition: color .2s;
+  background: none; border: none; padding: 0; margin: 0;
+  font-family: inherit; text-align: left; cursor: pointer; line-height: 1.4;
+}
+.footer-col a:hover,
+.footer-col button:hover { color: var(--joy); }
+
+.footer-bottom {
+  padding-top: 28px; border-top: 1px solid rgba(250,247,242,.08);
+  display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; text-align: center;
+}
+.footer-bottom p { font-size: 13px; color: rgba(250,247,242,.3); }
+
+/* Sprachleiste oben im Footer */
+.footer-langbar {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 14px; padding-bottom: 40px; margin-bottom: 44px;
+  border-bottom: 1px solid rgba(250,247,242,.1);
+}
+.footer-langbar-label {
+  font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+  color: rgba(250,247,242,.4); font-weight: 600;
+}
+.footer-lang { display: flex; gap: 10px; flex-wrap: wrap; }
+.footer-lang button {
+  font-size: 16px; font-weight: 500;
+  color: rgba(250,247,242,.7); background: rgba(250,247,242,.06);
+  padding: 9px 20px; border-radius: 100px;
+  border: 1px solid rgba(250,247,242,.14);
+  font-family: inherit; cursor: pointer;
+  transition: all .2s;
+}
+.footer-lang button:hover { color: var(--cream); border-color: var(--joy); }
+.footer-lang button.active {
+  background: var(--joy); color: var(--earth);
+  border-color: var(--joy); font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════
+   COOKIE BANNER
+═══════════════════════════════════════════ */
+#cookie-banner {
+  position: fixed; bottom: 24px; left: 24px; right: 24px;
+  background: var(--earth); color: var(--cream);
+  border-radius: var(--radius-lg); padding: 20px 28px;
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  box-shadow: var(--shadow-lg); z-index: 500;
+  max-width: 720px; margin: 0 auto;
+}
+#cookie-banner p { font-size: 14px; color: rgba(250,247,242,.75); line-height: 1.5; flex: 1; min-width: 200px; }
+#cookie-banner p a { color: var(--joy); text-decoration: underline; }
+.cookie-btns { display: flex; gap: 10px; }
+.cookie-accept {
+  background: var(--joy); color: var(--earth);
+  padding: 9px 22px; border-radius: 100px;
+  font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+  transition: background .2s;
+}
+.cookie-accept:hover { background: var(--joy-dark); }
+.cookie-decline {
+  background: transparent; color: rgba(250,247,242,.5);
+  padding: 9px 16px; border-radius: 100px;
+  font-size: 13px; cursor: pointer; border: none;
+  transition: color .2s;
+}
+.cookie-decline:hover { color: var(--cream); }
+
+/* ═══════════════════════════════════════════
+   SCROLL TO TOP
+═══════════════════════════════════════════ */
+#scroll-top {
+  position: fixed; bottom: 28px; right: 28px; z-index: 300;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--earth); color: var(--cream);
+  border: none; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-md);
+  opacity: 0; transform: translateY(12px);
+  transition: opacity .3s, transform .3s, background .2s;
+}
+#scroll-top.visible { opacity: 1; transform: none; }
+#scroll-top:hover { background: var(--teal); }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════ */
+@media (max-width: 1100px) {
+  nav { padding: 0 28px; }
+  .nav-links { gap: 20px; }
+  .hero { grid-template-columns: 1fr; padding: calc(var(--nav-h) + 48px) 28px 60px; }
+  .hero-visual { display: none; }
+  .cat-grid { grid-template-columns: repeat(3, 1fr); }
+  .blog-grid { grid-template-columns: 1fr 1fr; }
+  .blog-card.wide { grid-column: auto; flex-direction: column; }
+  .blog-card.wide .card-thumb { width: 100%; height: 200px; }
+  .ai-inner { grid-template-columns: 1fr; gap: 48px; }
+  .wisdom-grid { grid-template-columns: repeat(2, 1fr); }
+  .featured-inner { grid-template-columns: 1fr; }
+  .featured-sidebar { position: static; }
+  .footer-top { grid-template-columns: 1fr 1fr; gap: 32px; }
+}
+
+@media (max-width: 768px) {
+  :root { --nav-h: 60px; }
+  nav { padding: 0 20px; }
+  .nav-links, .nav-right .nav-cta, .nav-right .lang-switcher { display: none; }
+  .hamburger { display: flex; }
+  .hero { padding: calc(var(--nav-h) + 32px) 20px 48px; }
+  .hero-sub { font-size: 16px; }
+  .categories, .blog, .ai-world, .newsletter, .wisdom, .featured-section { padding: 64px 20px; }
+  .cat-grid { grid-template-columns: repeat(2, 1fr); }
+  .blog-grid { grid-template-columns: 1fr; }
+  .wisdom-grid { grid-template-columns: 1fr 1fr; }
+  footer { padding: 48px 20px 24px; }
+  .footer-top { grid-template-columns: 1fr; }
+  .nl-form { flex-direction: column; border-radius: var(--radius-lg); padding: 16px; }
+  .nl-form button { border-radius: var(--radius-md); }
+  .footer-bottom { flex-direction: column; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .wisdom-grid { grid-template-columns: 1fr; }
+  .cat-grid { grid-template-columns: 1fr; }
+  .hero-stats { gap: 24px; }
+}
+/* ===== Native Anker-Navigation (zuverlässig auf allen Browsern, inkl. iOS) ===== */
+html { scroll-behavior: smooth; }
+section[id], [id].section, #home, #categories, #featured, #blog, #ai, #wisdom, #newsletter, #about {
+  scroll-margin-top: 88px; /* Platz unter der fixierten Navbar */
+}
+/* Sicherheits-Hygiene: dekorative Ebenen fangen nie Klicks ab */
+.hero-bg, .ai-world-bg, .wisdom-bg, .orb,
+.ticker::before, .ticker::after, .cat-card::before,
+.hero-badge::before, .nav-links a::after, .featured-label::before {
+  pointer-events: none;
+}
+
+/* ============================================================
+   READER (Artikel-Overlay) — React-Version
+   ============================================================ */
+.reader{position:fixed;inset:0;z-index:9999;}
+.reader-backdrop{position:absolute;inset:0;background:rgba(44,24,16,.55);backdrop-filter:blur(4px);animation:rdFade .3s ease;}
+@keyframes rdFade{from{opacity:0}to{opacity:1}}
+.reader-panel{position:absolute;top:0;right:0;height:100%;width:min(720px,100%);
+  background:#FAF7F2;color:#2C1810;overflow-y:auto;box-shadow:-24px 0 80px rgba(44,24,16,.25);
+  animation:rdSlide .35s ease;}
+@keyframes rdSlide{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+.reader-hero{padding:64px 56px 28px;position:relative;}
+.reader-emoji{font-size:56px;line-height:1;margin-bottom:18px;}
+.reader-badge{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;padding:5px 12px;border-radius:100px;background:#E8F5F3;color:#1A7A6E;margin-bottom:18px;}
+.reader-title{font-family:'Playfair Display',Georgia,serif;font-size:34px;line-height:1.18;margin:0 0 14px;font-weight:700;}
+.reader-meta{font-size:14px;color:#6B6560;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.reader-meta .dot{width:4px;height:4px;border-radius:50%;background:#C9C2BA;display:inline-block;}
+.reader-body{padding:8px 56px 80px;font-size:17px;line-height:1.72;}
+.reader-body h2{font-family:'Playfair Display',Georgia,serif;font-size:23px;margin:34px 0 12px;color:#1A7A6E;}
+.reader-body p{margin:0 0 18px;}
+.reader-body em{font-style:italic;}
+.reader-body strong{color:#2C1810;}
+.reader-close{position:absolute;top:24px;right:28px;width:42px;height:42px;border:none;
+  border-radius:50%;background:#FFF;color:#2C1810;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(44,24,16,.12);
+  display:flex;align-items:center;justify-content:center;transition:transform .2s;z-index:2;}
+.reader-close:hover{transform:rotate(90deg) scale(1.05);}
+@media(max-width:600px){
+  .reader-hero{padding:56px 24px 22px;}
+  .reader-body{padding:8px 24px 64px;font-size:16px;}
+  .reader-title{font-size:27px;}
+}
+
+/* ============================================================
+   RECHTSSEITEN (Impressum / Datenschutz) — gescoped
+   ============================================================ */
+.legal-page{background:var(--cream,#FAF7F2);color:var(--earth,#2C1810);min-height:100vh;line-height:1.7;}
+.legal-page .wrap{max-width:760px;margin:0 auto;padding:40px 24px 96px;}
+.legal-page .back{display:inline-flex;align-items:center;gap:6px;margin-bottom:32px;color:var(--teal,#1A7A6E);
+  background:none;border:none;font:inherit;font-weight:500;cursor:pointer;padding:0;}
+.legal-page .back:hover{text-decoration:underline;}
+.legal-page h1{font-family:'Playfair Display',Georgia,serif;font-size:36px;margin-bottom:8px;}
+.legal-page h2{font-family:'Playfair Display',Georgia,serif;font-size:22px;color:var(--teal,#1A7A6E);margin:34px 0 10px;}
+.legal-page h3{font-size:17px;margin:22px 0 6px;}
+.legal-page p,.legal-page li{margin-bottom:12px;}
+.legal-page ul{padding-left:22px;}
+.legal-page a{color:var(--teal,#1A7A6E);}
+.legal-page .meta{color:var(--gray,#6B6560);font-size:14px;margin-bottom:36px;}
+.legal-page .note{background:#E8F5F3;border-left:3px solid var(--teal,#1A7A6E);padding:12px 16px;border-radius:6px;font-size:15px;margin:18px 0;}
+.legal-page footer{border-top:1px solid #E5DFD6;margin-top:48px;padding-top:20px;font-size:14px;color:var(--gray,#6B6560);}
