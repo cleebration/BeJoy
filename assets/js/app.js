@@ -192,7 +192,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReader(
 function scrollToBlogFiltered(cat){
   const tab = document.querySelector(`.filter-tab[data-cat="${cat}"]`);
   if (tab) tab.click();
-  document.getElementById('blog')?.scrollIntoView({behavior:'smooth', block:'start'});
+  // Native, zuverlässige Navigation (auch auf iOS): Hash setzen → Browser
+  // springt zu #blog, CSS scroll-behavior macht es weich.
+  if (document.getElementById('blog')) location.hash = 'blog';
 }
 
 document.addEventListener('click', e => {
@@ -225,19 +227,15 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // 6) Smooth-Scroll für echte #-Anker (Menü etc.)
+  // 6) #-Anker: NATIV navigieren lassen (kein preventDefault!).
+  //    Der Browser springt zuverlässig zum Ziel; weiches Scrollen
+  //    übernimmt CSS (html { scroll-behavior: smooth }). Wir schließen
+  //    hier nur das mobile Menü. Plain-Links (Impressum etc.) laufen
+  //    ohnehin nativ, da sie keine Bedingung oben treffen.
   const anchor = e.target.closest('a[href^="#"]');
   if (anchor) {
-    const href = anchor.getAttribute('href');
-    if (href.length > 1) {
-      const target = document.getElementById(href.slice(1));
-      if (target) {
-        e.preventDefault();
-        target.scrollIntoView({behavior:'smooth', block:'start'});
-        document.getElementById('hamburger')?.classList.remove('open');
-        document.getElementById('mobile-nav')?.classList.remove('open');
-      }
-    }
+    document.getElementById('hamburger')?.classList.remove('open');
+    document.getElementById('mobile-nav')?.classList.remove('open');
   }
 });
 
@@ -338,42 +336,3 @@ try {
   // Selbst wenn das Init teilweise scheitert, bleibt der zentrale
   // Klick-Handler aktiv → Navigation funktioniert weiter.
 }
-
-
-/* ─────────────────────────────────────────────────────────────
-   TIPP-MELDER (temporär) – zeigt live, ob & worauf die Seite
-   einen Klick/Tipp empfängt. Capture-Phase = sieht alles zuerst.
-───────────────────────────────────────────────────────────── */
-(function(){
-  var fix=document.createElement('style');
-  fix.textContent=
-    '.hero-bg,.ai-world-bg,.wisdom-bg,.orb,.featured-section::before,.cat-card::before,'+
-    '.ticker::before,.ticker::after,.hero-badge::before,.nav-links a::after,.featured-label::before'+
-    '{pointer-events:none!important;}'+
-    'a,button,input,label,nav,.nav-links,.nav-links a,footer,.footer-col a,.blog-card,.cat-card,'+
-    '.wisdom-card,.ai-card,.read-link,[data-open-id],[data-cat-link],[data-lang]{pointer-events:auto!important;}';
-  document.head.appendChild(fix);
-
-  function describe(t){
-    if(!t||!t.tagName) return '(nichts)';
-    var id=t.id?'#'+t.id:'';
-    var c=(t.className&&t.className.toString)?'.'+t.className.toString().trim().split(/\s+/).join('.'):'';
-    var a=t.closest&&t.closest('a'); var href=a?(' href='+a.getAttribute('href')):'';
-    return t.tagName.toLowerCase()+id+c+href;
-  }
-  var panel=document.createElement('div');
-  panel.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;'+
-    'background:#1A7A6E;color:#fff;font:13px/1.5 system-ui,sans-serif;padding:10px 12px;'+
-    'border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);max-height:42vh;overflow:auto;pointer-events:none;';
-  panel.textContent='TIPP-TEST: Tippe jetzt auf einen Link / eine Karte. Hier erscheint, was die Seite empfängt.';
-  function add(s){var d=document.createElement('div');d.textContent=s;panel.appendChild(d);panel.scrollTop=panel.scrollHeight;}
-  var n=0;
-  ['pointerdown','click','touchstart'].forEach(function(type){
-    window.addEventListener(type,function(e){
-      n++; var line=type+' #'+n+' -> '+describe(e.target);
-      setTimeout(function(){ add(line+(type==='click'?(' | verhindert='+e.defaultPrevented):'')); },0);
-    },true);
-  });
-  if(document.body) document.body.appendChild(panel);
-  else window.addEventListener('load',function(){document.body.appendChild(panel);});
-})();
