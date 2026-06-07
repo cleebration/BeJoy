@@ -339,59 +339,41 @@ try {
   // Klick-Handler aktiv → Navigation funktioniert weiter.
 }
 
+
 /* ─────────────────────────────────────────────────────────────
-   KLICK-FIX + SELBSTDIAGNOSE (temporär, Juni 2026)
-   1) Erzwingt: dekorative Ebenen fangen keine Klicks ab.
-   2) Zeigt sichtbar auf der Seite, ob/was über den Links liegt.
-   Wieder entfernen, sobald die Ursache klar ist.
+   TIPP-MELDER (temporär) – zeigt live, ob & worauf die Seite
+   einen Klick/Tipp empfängt. Capture-Phase = sieht alles zuerst.
 ───────────────────────────────────────────────────────────── */
 (function(){
-  var fix = document.createElement('style');
-  fix.id = 'bejoy-click-fix';
-  fix.textContent =
-    '.hero-bg,.ai-world-bg,.wisdom-bg,.orb,.featured-section::before,' +
-    '.cat-card::before,.ticker::before,.ticker::after,' +
-    '.hero-badge::before,.nav-links a::after,.featured-label::before' +
-    '{pointer-events:none !important;}' +
-    'a,button,input,label,nav,.nav-links,.nav-links a,footer,.footer-col a,' +
-    '.blog-card,.cat-card,.wisdom-card,.ai-card,.read-link,' +
-    '[data-open-id],[data-cat-link],[data-lang]{pointer-events:auto !important;}';
+  var fix=document.createElement('style');
+  fix.textContent=
+    '.hero-bg,.ai-world-bg,.wisdom-bg,.orb,.featured-section::before,.cat-card::before,'+
+    '.ticker::before,.ticker::after,.hero-badge::before,.nav-links a::after,.featured-label::before'+
+    '{pointer-events:none!important;}'+
+    'a,button,input,label,nav,.nav-links,.nav-links a,footer,.footer-col a,.blog-card,.cat-card,'+
+    '.wisdom-card,.ai-card,.read-link,[data-open-id],[data-cat-link],[data-lang]{pointer-events:auto!important;}';
   document.head.appendChild(fix);
 
-  function diagnose(){
-    var checks = [
-      ['Menue Blog',       document.querySelector('a[href="#blog"]')],
-      ['Footer Impressum', document.querySelector('footer a[href*="impressum"]')],
-      ['Blog-Karte',       document.querySelector('.blog-card')]
-    ];
-    var problems = [];
-    checks.forEach(function(c){
-      var name = c[0], el = c[1];
-      if(!el) return;
-      var r = el.getBoundingClientRect();
-      if(r.width === 0 || r.height === 0) return;
-      var top = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2);
-      if(top && top !== el && !el.contains(top) && !top.contains(el)){
-        var id  = top.id ? '#'+top.id : '';
-        var cls = (top.className && top.className.toString)
-          ? '.'+top.className.toString().trim().split(/\s+/).join('.') : '';
-        problems.push(name + ' -> ' + top.tagName.toLowerCase() + id + cls);
-      }
-    });
-    var box = document.createElement('div');
-    box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;' +
-      'pointer-events:none;font:13px/1.4 system-ui,sans-serif;padding:9px 13px;text-align:left;color:#fff;';
-    if(problems.length){
-      box.style.background = '#B00020';
-      box.textContent = 'KLICK-BLOCKER: ' + problems.join('   |   ');
-    } else {
-      box.style.background = '#1A7A6E';
-      box.textContent = 'Klick-Check OK – kein Element liegt ueber den Links.';
-    }
-    document.body.appendChild(box);
-    setTimeout(function(){ box.style.transition='opacity .6s'; box.style.opacity='0';
-      setTimeout(function(){ box.remove(); }, 800); }, 9000);
+  function describe(t){
+    if(!t||!t.tagName) return '(nichts)';
+    var id=t.id?'#'+t.id:'';
+    var c=(t.className&&t.className.toString)?'.'+t.className.toString().trim().split(/\s+/).join('.'):'';
+    var a=t.closest&&t.closest('a'); var href=a?(' href='+a.getAttribute('href')):'';
+    return t.tagName.toLowerCase()+id+c+href;
   }
-  if(document.readyState === 'complete') setTimeout(diagnose, 500);
-  else window.addEventListener('load', function(){ setTimeout(diagnose, 500); });
+  var panel=document.createElement('div');
+  panel.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;'+
+    'background:#1A7A6E;color:#fff;font:13px/1.5 system-ui,sans-serif;padding:10px 12px;'+
+    'border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);max-height:42vh;overflow:auto;pointer-events:none;';
+  panel.textContent='TIPP-TEST: Tippe jetzt auf einen Link / eine Karte. Hier erscheint, was die Seite empfängt.';
+  function add(s){var d=document.createElement('div');d.textContent=s;panel.appendChild(d);panel.scrollTop=panel.scrollHeight;}
+  var n=0;
+  ['pointerdown','click','touchstart'].forEach(function(type){
+    window.addEventListener(type,function(e){
+      n++; var line=type+' #'+n+' -> '+describe(e.target);
+      setTimeout(function(){ add(line+(type==='click'?(' | verhindert='+e.defaultPrevented):'')); },0);
+    },true);
+  });
+  if(document.body) document.body.appendChild(panel);
+  else window.addEventListener('load',function(){document.body.appendChild(panel);});
 })();
