@@ -829,3 +829,14 @@ footer {
   .cat-grid { grid-template-columns: 1fr; }
   .hero-stats { gap: 24px; }
 }
+/* ===== Native Anker-Navigation (zuverlässig auf allen Browsern, inkl. iOS) ===== */
+html { scroll-behavior: smooth; }
+section[id], [id].section, #home, #categories, #featured, #blog, #ai, #wisdom, #newsletter, #about {
+  scroll-margin-top: 88px; /* Platz unter der fixierten Navbar */
+}
+/* Sicherheits-Hygiene: dekorative Ebenen fangen nie Klicks ab */
+.hero-bg, .ai-world-bg, .wisdom-bg, .orb,
+.ticker::before, .ticker::after, .cat-card::before,
+.hero-badge::before, .nav-links a::after, .featured-label::before {
+  pointer-events: none;
+}
