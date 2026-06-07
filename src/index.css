@@ -30,7 +30,7 @@
   --shadow-md:  0 8px 32px rgba(44,24,16,0.10);
   --shadow-lg:  0 24px 80px rgba(44,24,16,0.13);
 
-  --nav-h:      72px;
+  --nav-h:      80px;
 }
 
 /* ═══════════════════════════════════════════
@@ -62,19 +62,19 @@ ul { list-style: none; }
   display: flex; align-items: center; gap: 4px;
   background: var(--light);
   border-radius: var(--radius-xl);
-  padding: 4px;
+  padding: 5px;
 }
 .lang-btn {
   background: none;
-  font-size: 12px; font-weight: 500;
+  font-size: 15px; font-weight: 600;
   color: var(--gray);
-  padding: 5px 11px; border-radius: 100px;
-  transition: all .2s;
+  padding: 7px 15px; border-radius: 100px;
+  transition: all .2s; cursor: pointer; border: none;
   letter-spacing: .3px;
 }
 .lang-btn.active {
-  background: var(--earth);
-  color: var(--cream);
+  background: var(--joy);
+  color: var(--earth);
 }
 .lang-btn:hover:not(.active) { color: var(--earth); }
 
@@ -98,25 +98,25 @@ nav.scrolled { box-shadow: 0 4px 30px rgba(44,24,16,.08); }
 .logo-svg  { width: 40px; height: 40px; flex-shrink: 0; }
 .logo-text {
   font-family: 'Playfair Display', serif;
-  font-size: 21px; font-weight: 700;
+  font-size: 24px; font-weight: 700;
   color: var(--earth); letter-spacing: -.4px;
 }
 .logo-text span { color: var(--joy); }
 
 .nav-links {
-  display: flex; align-items: center; gap: 32px;
+  display: flex; align-items: center; gap: 38px;
 }
 .nav-links a {
-  font-size: 14px; font-weight: 500; color: var(--gray);
+  font-size: 17px; font-weight: 600; color: var(--earth);
   position: relative; transition: color .2s;
-  padding-bottom: 2px;
+  padding-bottom: 3px;
 }
 .nav-links a::after {
   content: ''; position: absolute; bottom: -2px; left: 0;
-  width: 0; height: 1.5px; background: var(--joy);
+  width: 0; height: 2px; background: var(--joy);
   transition: width .3s ease;
 }
-.nav-links a:hover { color: var(--earth); }
+.nav-links a:hover { color: var(--teal); }
 .nav-links a:hover::after { width: 100%; }
 
 .nav-right { display: flex; align-items: center; gap: 16px; }
@@ -124,8 +124,8 @@ nav.scrolled { box-shadow: 0 4px 30px rgba(44,24,16,.08); }
 .nav-cta {
   display: inline-flex; align-items: center;
   background: var(--joy); color: var(--earth);
-  font-size: 13px; font-weight: 600;
-  padding: 9px 20px; border-radius: var(--radius-xl);
+  font-size: 15px; font-weight: 600;
+  padding: 11px 24px; border-radius: var(--radius-xl);
   transition: background .2s, transform .2s;
   letter-spacing: .2px;
 }
