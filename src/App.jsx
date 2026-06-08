@@ -1,6 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { i18n } from "./i18n.js";
 import { posts, sidebarPosts } from "./data.js";
+/* ── Deep-Linking-Helfer: /blog/<slug> ───────────────────── */
+const slugify = (s) =>
+  (s || "").toLowerCase()
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .replace(/&/g, " und ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+const postSlug = (p) => (p ? slugify(p.de?.title || "") : "");
+const findPostBySlug = (slug) => posts.find((p) => postSlug(p) === slug) || null;
 import { impressumHTML, datenschutzHTML } from "./legal.js";
 
 /* ─────────────────────────────────────────────────────────────
@@ -139,6 +148,29 @@ export default function App() {
     );
   }
 
+  /* Deep-Linking: URL /blog/<slug> <-> geöffneter Artikel */
+  useEffect(() => {
+    const applyFromPath = () => {
+      const m = window.location.pathname.match(/^\/blog\/([^/]+)\/?$/);
+      setActivePost(m ? findPostBySlug(decodeURIComponent(m[1])) : null);
+    };
+    applyFromPath();
+    window.addEventListener("popstate", applyFromPath);
+    return () => window.removeEventListener("popstate", applyFromPath);
+  }, []);
+
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) { didMountRef.current = true; return; }
+    const path = window.location.pathname;
+    if (activePost) {
+      const target = `/blog/${postSlug(activePost)}`;
+      if (path !== target) window.history.pushState({}, "", target);
+    } else if (/^\/blog\//.test(path)) {
+      window.history.pushState({}, "", "/");
+    }
+  }, [activePost]);
+   
   const featuredPost = posts.find((p) => p.wide) || posts[0];
   const visiblePosts = filterCat === "all" ? posts : posts.filter((p) => p.cat === filterCat);
 
