@@ -82,18 +82,6 @@ export default function App() {
   const openLegal = (which) => { setView(which); setActivePost(null); setMobileOpen(false); window.scrollTo(0, 0); };
   const goHome = () => { setView("home"); window.scrollTo(0, 0); };
 
-  /* Newsletter (noch ohne Backend) */
-  const submitNl = () => {
-    const input = document.getElementById("nl-input");
-    const val = (input && input.value || "").trim();
-    if (!val || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)) {
-      setNlState({ msg: t("nl_error_placeholder") || "Bitte gültige E-Mail eingeben", ok: false });
-      return;
-    }
-    setNlState({ msg: t("nl_success") || "Danke! Bald mehr.", ok: true });
-    if (input) input.value = "";
-  };
-
   /* Reveal-Animationen aktivieren + Scroll-Fortschritt + Top-Button */
   useEffect(() => {
     const els = Array.from(document.querySelectorAll(".reveal"));
@@ -422,13 +410,11 @@ export default function App() {
           <span className="section-tag">{t("section_nl")}</span>
           <h2>{t("nl_h")}</h2>
           <p>{t("nl_p")}</p>
-          <div className="nl-form">
-            <input type="email" id="nl-input" placeholder={t("nl_placeholder")} autoComplete="email" />
-            <button type="button" onClick={submitNl}>{t("nl_btn")}</button>
-          </div>
-          {nlState.msg
-            ? <p className="nl-note" style={{ color: nlState.ok ? "var(--teal)" : "var(--rose)", fontWeight: 600 }}>{nlState.msg}</p>
-            : <p className="nl-note">{t("nl_note")}</p>}
+          {/* Zentraler Newsletter-Baustein (newsletter-hub, seit 19.10.2026): Formular + Anmeldung
+              kommen von newsletter.cleebration.com; Einstellungen in
+              cleebration-web/newsletter-hub/worker/sites.config.mjs (Schlüssel "bejoy"). */}
+          <newsletter-signup site="bejoy" lang={lang} heading="" text=""></newsletter-signup>
+          <p className="nl-note">{t("nl_note")}</p>
         </div>
       </section>
 
